@@ -14,6 +14,7 @@ history:
 01-06-2025  User can select a local image file.
 01-08-2025  Add functions to enlarge or reduce size of a circle object.
 01-09-2025  Add function to drag the current shape to a new location.
+            Commit again.
 """
 # TODO: investigate Shift-Up event
 from PIL import Image, ImageTk
