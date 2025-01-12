@@ -15,14 +15,20 @@ history:
 01-08-2025  Add functions to enlarge or reduce size of a circle object.
 01-09-2025  Add function to drag the current shape to a new location.
             Commit again.
+01-12-2025  Debug drag function. Add function to nudge the shape 1 pixel.
+            Read line color and line thickness. Move creation of shape object
+            into its own funciton.
 """
-# TODO: investigate Shift-Up event
+# TODO: modify shape size/posn based on self.selected
+# TODO: What class methods can be external functions?
+# TODO: What external functions should be class methods?
 from PIL import Image, ImageTk
 
 import tkinter as tk
 from tkinter import ttk, filedialog
+from importlib.machinery import SourceFileLoader
 
-import canvas_ui as cnv
+cnv = SourceFileLoader("cnv", "../image_display_RF/canvas_ui.py").load_module()
 
 
 class Sketchpad(tk.Canvas):
@@ -85,6 +91,9 @@ class Sketchpad(tk.Canvas):
         self.line_count = 0
         self.points = []
         self.linetags = []
+        self.shapetags = []
+        self.next_shape = 'oval'
+        self.selected = None
 
         match self.mode:
             case 'freehand':
@@ -99,14 +108,16 @@ class Sketchpad(tk.Canvas):
                 self.bind('<Shift-Motion>', self.drag_shape)
                 self.bind('<Control-Motion>', self.expand_shape)
                 self.bind('<Alt-Motion>', self.contract_shape)
-                # use scrollwheel if available (also works for middle button
-                # plus trackbutton on ThinkPad)
+
+                # use scrollwheel if available (also works for middle mouse button
+                # plus trackbutton on ThinkPad):
                 # self.bind('<Button-4>', self.expand_shape)
                 # self.bind('<Button-5>', self.contract_shape)
-                self.bind('<Shift-Up>', self.nudge_shape)
-                # self.bind('<Shift-Down>', self.nudge_shape)
-                # self.bind('<Shift-Left>', self.nudge_shape)
-                # self.bind('<Shift-Right>', self.nudge_shape)
+
+                self.master.bind('<Shift-Up>', lambda ev, h=0, v=-1: self.nudge_shape(ev, h, v))
+                self.master.bind('<Shift-Down>', lambda ev, h=0, v=1: self.nudge_shape(ev, h, v))
+                self.master.bind('<Shift-Left>', lambda ev, h=-1, v=0: self.nudge_shape(ev, h, v))
+                self.master.bind('<Shift-Right>', lambda ev, h=1, v=0: self.nudge_shape(ev, h, v))
 
         self.bind("<Motion>", self.report_posn)
         self.bind("<Leave>", self.clear_posn)
@@ -257,69 +268,98 @@ class Sketchpad(tk.Canvas):
         self.report_posn(event)
         self.set_start(event)
 
-    def set_shape(self, event):
-        # ? not needed for functionality, but better practice to include
-        # global center_posn
+    def create_shape(self,
+                     start,
+                     end,
+                     shape='oval',
+                     linecolor='black',
+                     width=1,
+                     tag='oval'):
+        id1 = None
 
+        match shape:
+            case 'oval':
+                taglist = ['oval', tag]
+                id1 = self.create_oval(*start,
+                                       *end,
+                                       outline=linecolor,
+                                       width=width,
+                                       tags=taglist)
+            case _:
+                pass
+
+        return id1
+
+
+    def set_shape(self, event):
         set_center(event)
-        # print(f"center posn: {center_posn['x']}, {center_posn['y']}")
+
         xwidth, ywidth = 20.0, 20.0
         self.set_start(event)
 
         start_posn = self.startx - xwidth, self.starty - ywidth
         end_posn = self.startx + xwidth, self.starty + ywidth
-        id1 = self.create_oval(*start_posn,
-                               *end_posn,
-                               outline='black',
-                               width=2.0,
-                               tags='circle1')
-
-        print(f'start, previous: {self.startx}, {self.starty} -- {self.previousx}, {self.previousy}')
-        # shape_var.set(value=shape_name.winfo_name())
-        # print(f'shape selected: {shape_var.get()}')
-        # print(f'shape selected: {shape_var.get()}')
+        this_tag = self.next_shape + str(len(self.shapetags) + 1)
+        id1 = self.create_shape(start_posn,
+                                end_posn,
+                                shape=self.next_shape,
+                                linecolor=self.linecolor,
+                                width=self.linewidth,
+                                tag=this_tag)
+        # id1 = self.create_oval(*start_posn,
+        #                        *end_posn,
+        #                        outline=self.linecolor,
+        #                        width=self.linewidth,
+        #                        tags=['oval', this_tag])
+        if id1 is not None:
+            self.shapetags.append(this_tag)
+            self.selected = id1
+        # print(f'start, previous: {self.startx}, {self.starty} -- {self.previousx}, {self.previousy}')
 
         # get attributes
         # --------------
         # outline = self.itemcget(id1, 'outline')
         # print(f'outline is: {outline}')
 
-        # c = self.find('withtag', 'circle1')
+        # c = self.find('withtag', 'oval')
         # OR:
-        # self.find_withtag('circle1')
+        # self.find_withtag('oval')
 
 
     def drag_shape(self, event):
         dx = 0
         dy = 0
+        shift = 1
+        theshape = self.shapetags[-1]
 
-        if event.x > self.previousx: dx = 4
-        if event.x < self.previousx: dx = -4
-        if event.y > self.previousy: dy = 4
-        if event.y < self.previousy: dy = -4
+        if event.x > self.previousx: dx = shift
+        if event.x < self.previousx: dx = -shift
+        if event.y > self.previousy: dy = shift
+        if event.y < self.previousy: dy = -shift
 
         self.previousx = event.x
         self.previousy = event.y
 
-        self.move('current', dx, dy)
+        self.move(theshape, dx, dy)
 
 
-    def nudge_shape(self, event):
-        print(f'in nudge_shape, ev: {event}')
-        print(self.startx)
-        # dx = 1
-        # dy = 1
-
-        # self.move('current', dx, dy)
+    def nudge_shape(self, event, dx, dy):
+        # print(f'in nudge_shape, ev: {event}')
+        canvas1.focus_set()
+        theshape = self.shapetags[-1]
+        self.move(theshape, dx, dy)
 
 
     def expand_shape(self, event):
         # global center_posn
-        self.scale('circle1', center_posn['x'], center_posn['y'], 1.01, 1.01)
+        theshape = self.shapetags[-1]
+        self.scale(theshape, center_posn['x'], center_posn['y'], 1.01, 1.01)
 
 
     def contract_shape(self, event):
-        self.scale('circle1', center_posn['x'], center_posn['y'], 0.99, 0.99)
+        theshape = self.shapetags[-1]
+        # print(f'contractint {theshape}')
+        self.scale(theshape, center_posn['x'], center_posn['y'], 0.99, 0.99)
 
 
 # END Class Sketchpad ==========
@@ -327,19 +367,19 @@ class Sketchpad(tk.Canvas):
 file_path = ''
 
 def set_color(event):
-    """Set drawing color for both canvases."""
+    """Set drawing color for canvas."""
     color_choice = colorbar.gettags('current')
-    print(f'color: {color_choice}')
-    # sketch.linecolor = color_choice[0]
-    sketch.linecolor = color_choice[0]
-
-    # sketch.report_color(color_choice[0])
-    sketch.report_color(color_choice[0])
+    # print(f'color: {color_choice}')
+    canvas1.linecolor = color_choice[0]
+    canvas1.report_color(color_choice[0])
 
 
 def set_linewidth(var):
-    """Set line width for canvas 2 (lines)."""
-    sketch.linewidth = var.get()
+    """Set line width for canvas.
+
+    parameter: var = the IntVar in adj_linewidth.
+    """
+    canvas1.linewidth = var.get()
 
 
 def open_picture():
@@ -350,7 +390,7 @@ def open_picture():
                                            filetypes=[("PNG files",'*.png'),
                                                       ("JPEG file",'*.jpeg')])
 
-    add_image(sketch, file_path)
+    add_image(canvas1, file_path)
 
 
 def add_image(canv, fpath):
@@ -380,13 +420,22 @@ def add_image(canv, fpath):
 
 def set_center(ev):
     center_posn['x'], center_posn['y'] = ev.x, ev.y
-    print(f'in set_center: {center_posn["x"]}, {center_posn["y"]}')
+    # print(f'in set_center: {center_posn["x"]}, {center_posn["y"]}')
+
+
+def select_shape(event):
+    found = canvas1.find_closest(event.x, event.y, halo=25)
+    if len(found) > 0:
+        canvas1.selected = found[0]
+        canvas1.itemconfigure(canvas1.selected, fill='orange')
+        itemtag = canvas1.itemcget(canvas1.selected, 'tag')
+        print(f'itemtag: {itemtag}')
 
 
 root = tk.Tk()
 
-sketch = Sketchpad(root, width=640, height=640, background='#ccc', mode='shapes')
-# print(f'widgetName, _name: {sketch.widgetName}, {sketch._name}')
+canvas1 = Sketchpad(root, width=640, height=640, background='#ccc', mode='shapes')
+canvas1.bind('<Button-3>', lambda event: select_shape(event))
 
 num_colors = 8  # not used yet
 colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'magenta', 'black']
@@ -416,7 +465,7 @@ controls = ttk.Frame(root, padding=2, relief='groove')
 status = ttk.Label(controls, text='mode:')
 status.pack(side='left')
 
-status_value = ttk.Label(controls, foreground='blue', text=sketch.mode)
+status_value = ttk.Label(controls, foreground='blue', text=canvas1.mode)
 status_value.pack(side='left')
 
 cursor_posn = tk.Text(background='#ff0')
@@ -457,7 +506,8 @@ btnq = ttk.Button(quit_fr,
                   command=root.quit,
                   style="MyButton1.TButton")
 
-sketch.grid(column=0, row=3)
+canvas1.grid(column=0, row=3)
+canvas1.grid(column=0, row=3)
 controls.grid(column=0, row=4, sticky='ew')
 colorbar.grid(column=0, row=5, pady=10)
 open_button.grid(column=0, row=6, pady=10)
@@ -467,8 +517,8 @@ circle.grid(column=0, row=7)
 btnq.pack()
 quit_fr.grid(column=0, row=8, pady=10)
 
-# sketch.update()
-# print(f'size of sketch: {sketch.winfo_width()}, {sketch.winfo_height()}')
+# canvas1.update()
+# print(f'size of canvas1: {canvas1.winfo_width()}, {canvas1.winfo_height()}')
 
 # colorbar.update()
 # print(f'size of colorbar: {colorbar.winfo_width()}')
