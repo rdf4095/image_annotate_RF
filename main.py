@@ -18,10 +18,16 @@ history:
 01-12-2025  Debug drag function. Add function to nudge the shape 1 pixel.
             Read line color and line thickness. Move creation of shape object
             into its own funciton.
+01-16-2025  Create ShapeCanvas as a child class of Sketchpad. drag_shape() now
+            updates center location of the object. Selecting a shape now
+            highlights only that shape.
 """
-# TODO: modify shape size/posn based on self.selected
-# TODO: What class methods can be external functions?
-# TODO: What external functions should be class methods?
+# TODO: 1) drag using self.selected requires different center_posn per object
+# TODO: 2) in drag_shape(), use modifier key to constrain horizontal / vertical
+# TODO: 3) determine class methods for Sketchpad and ShapeCanvas objects
+# TODO: 4) consider a base class MyCanvas with the most basic features.
+#          Subclasses would be DrawCanvas (the existing Sketchpad), and
+#          ShapeCanvas.
 from PIL import Image, ImageTk
 
 import tkinter as tk
@@ -141,15 +147,15 @@ class Sketchpad(tk.Canvas):
         """Remove displayed cursor position from the canvas."""
         self.delete('text1')
 
-    def report_color(self, textstr) -> None:
-        """Display cursor position in lower right of canvas."""
-        self.delete('text2')
-        self.create_text(24,
-                         self.height - 10,
-                         fill=textstr,
-                         text=textstr,
-                         tags='text2')
-
+    # def report_color(self, textstr) -> None:
+    #     """Display line color in lower left of canvas."""
+    #     self.delete('text2')
+    #     self.create_text(24,
+    #                      self.height - 10,
+    #                      fill=textstr,
+    #                      text=textstr,
+    #                      tags='text2')
+    #
     def set_start(self, event) -> None:
         """Handler for L-mouse click in freehand mode: save initial cursor
         position (firstx,y) and next position clicked after closing a figure in
@@ -233,7 +239,6 @@ class Sketchpad(tk.Canvas):
     def draw_path(self, event) -> None:
         """Draw a path following the cursor.
 
-        TODO: use modifier key to constrain horizontal / vertical
         """
         x_threshold = 10
         y_threshold = 10
@@ -280,8 +285,166 @@ class Sketchpad(tk.Canvas):
         match shape:
             case 'oval':
                 taglist = ['oval', tag]
-                id1 = self.create_oval(*start,
-                                       *end,
+                id1 = self.create_oval(start,
+                                       end,
+                                       outline=linecolor,
+                                       width=width,
+                                       tags=taglist)
+                # w = self.itemcget('width')
+                # print(f'')
+            case _:
+                pass
+
+        return id1
+
+
+    def set_shape(self, event):
+        set_center(event)
+
+        xwidth, ywidth = 20.0, 20.0
+        self.set_start(event)
+
+        start_posn = self.startx - xwidth, self.starty - ywidth
+        end_posn = self.startx + xwidth, self.starty + ywidth
+        this_tag = self.next_shape + str(len(self.shapetags) + 1)
+        id1 = self.create_shape(start_posn,
+                                end_posn,
+                                shape=self.next_shape,
+                                linecolor=self.linecolor,
+                                width=self.linewidth,
+                                tag=this_tag)
+        if id1 is not None:
+            self.shapetags.append(this_tag)
+            self.selected = id1
+
+        # get attributes
+        # --------------
+        # outline = self.itemcget(id1, 'outline')
+        # print(f'outline is: {outline}')
+
+        # c = self.find('withtag', 'oval')
+        # OR:
+        # self.find_withtag('oval')
+
+
+    def drag_shape(self, event):
+        dx = 0
+        dy = 0
+        shift = 1
+        # theshape = self.shapetags[-1]
+        theshape = self.selected
+        print('in Sketchpad drag_shape')
+        if event.x > self.previousx: dx = shift
+        if event.x < self.previousx: dx = -shift
+        if event.y > self.previousy: dy = shift
+        if event.y < self.previousy: dy = -shift
+
+        self.previousx = event.x
+        self.previousy = event.y
+
+        center_posn['x'] += dx
+        center_posn['y'] += dy
+
+        self.move(theshape, dx, dy)
+
+
+    def nudge_shape(self, event, dx, dy):
+        # print(f'in nudge_shape, ev: {event}')
+        canvas1.focus_set()
+        theshape = self.shapetags[-1]
+        self.move(theshape, dx, dy)
+
+
+    def expand_shape(self, event):
+        # global center_posn
+        # theshape = self.shapetags[-1]
+        theshape = self.selected
+        self.scale(theshape, center_posn['x'], center_posn['y'], 1.01, 1.01)
+
+
+    def contract_shape(self, event):
+        # theshape = self.shapetags[-1]
+        theshape = self.selected
+        # print(f'contractint {theshape}')
+
+        self.scale(theshape, center_posn['x'], center_posn['y'], 0.99, 0.99)
+
+# END Class Sketchpad ==========
+
+class ShapeCanvas(Sketchpad):
+    def __init__(self, parent,
+                 width=320,
+                 height=320,
+                 mode='lines',
+                 background='#ffa',
+                 linewidth=1
+                 ):
+        """
+        Inits a ShapeCanvas object.
+
+        Parameters
+        ----------
+        width : Int
+            Canvas width.
+        height : Int
+            Canvas height.
+
+        Methods
+        -------
+        point_init:
+            Defines a Point object for x-y Canvas position.
+        """
+
+        self.width = width
+        self.height = height
+        self.mode = mode
+        self.background = background
+        self.linewidth = linewidth
+
+        super().__init__(parent,
+                         width=self.width,
+                         height=self.height,
+                         background=self.background)
+
+        self.linecolor = 'black'
+        self.firstx = 0
+        self.firsty = 0
+
+        self.startx = 0
+        self.starty = 0
+        self.previousx = 0
+        self.previousy = 0
+        # self.line_count = 0
+        self.points = []
+        # self.linetags = []
+        self.shapetags = []
+        self.next_shape = 'oval'
+        self.selected = None
+
+        self.bind('<Button-1>', self.set_shape)
+        self.bind('<Shift-Motion>', self.drag_shape)
+        self.bind('<Control-Motion>', self.expand_shape)
+        self.bind('<Alt-Motion>', self.contract_shape)
+
+        self.master.bind('<Shift-Up>', lambda ev, h=0, v=-1: self.nudge_shape(ev, h, v))
+        self.master.bind('<Shift-Down>', lambda ev, h=0, v=1: self.nudge_shape(ev, h, v))
+        self.master.bind('<Shift-Left>', lambda ev, h=-1, v=0: self.nudge_shape(ev, h, v))
+        self.master.bind('<Shift-Right>', lambda ev, h=1, v=0: self.nudge_shape(ev, h, v))
+
+    def create_shape(self,
+                     start,
+                     end,
+                     shape='oval',
+                     linecolor='black',
+                     width=1,
+                     tag='oval'):
+        id1 = None
+
+        match shape:
+            case 'oval':
+                taglist = ['oval', tag]
+                id1 = self.create_oval(start,
+                                       end,
                                        outline=linecolor,
                                        width=width,
                                        tags=taglist)
@@ -306,15 +469,9 @@ class Sketchpad(tk.Canvas):
                                 linecolor=self.linecolor,
                                 width=self.linewidth,
                                 tag=this_tag)
-        # id1 = self.create_oval(*start_posn,
-        #                        *end_posn,
-        #                        outline=self.linecolor,
-        #                        width=self.linewidth,
-        #                        tags=['oval', this_tag])
         if id1 is not None:
             self.shapetags.append(this_tag)
             self.selected = id1
-        # print(f'start, previous: {self.startx}, {self.starty} -- {self.previousx}, {self.previousy}')
 
         # get attributes
         # --------------
@@ -330,7 +487,8 @@ class Sketchpad(tk.Canvas):
         dx = 0
         dy = 0
         shift = 1
-        theshape = self.shapetags[-1]
+        # theshape = self.shapetags[-1]
+        theshape = self.selected
 
         if event.x > self.previousx: dx = shift
         if event.x < self.previousx: dx = -shift
@@ -340,44 +498,80 @@ class Sketchpad(tk.Canvas):
         self.previousx = event.x
         self.previousy = event.y
 
+        center_posn['x'] += dx
+        center_posn['y'] += dy
+        # print(f"ending center: {center_posn['x']}, {center_posn['y']}")
+
         self.move(theshape, dx, dy)
 
 
     def nudge_shape(self, event, dx, dy):
         # print(f'in nudge_shape, ev: {event}')
         canvas1.focus_set()
-        theshape = self.shapetags[-1]
+        # theshape = self.shapetags[-1]
+        theshape = self.selected
         self.move(theshape, dx, dy)
 
 
     def expand_shape(self, event):
         # global center_posn
-        theshape = self.shapetags[-1]
+        # theshape = self.shapetags[-1]
+        theshape = self.selected
+        # print(f'in expand_shape: center x,y: {center_posn["x"]}, {center_posn["y"]}')
         self.scale(theshape, center_posn['x'], center_posn['y'], 1.01, 1.01)
 
 
     def contract_shape(self, event):
-        theshape = self.shapetags[-1]
+        # theshape = self.shapetags[-1]
+        theshape = self.selected
         # print(f'contractint {theshape}')
         self.scale(theshape, center_posn['x'], center_posn['y'], 0.99, 0.99)
 
-
-# END Class Sketchpad ==========
+# END Class ShapeCanvas ==========
 
 file_path = ''
+
+
+# def drag_shape(event):
+#     dx = 0
+#     dy = 0
+#     shift = 1
+#     theshape = canvas1.shapetags[-1]
+#
+#     if event.x > canvas1.previousx: dx = shift
+#     if event.x < canvas1.previousx: dx = -shift
+#     if event.y > canvas1.previousy: dy = shift
+#     if event.y < canvas1.previousy: dy = -shift
+#
+#     canvas1.previousx = event.x
+#     canvas1.previousy = event.y
+#
+#     canvas1.move(theshape, dx, dy)
+
 
 def set_color(event):
     """Set drawing color for canvas."""
     color_choice = colorbar.gettags('current')
     # print(f'color: {color_choice}')
     canvas1.linecolor = color_choice[0]
-    canvas1.report_color(color_choice[0])
+    myshapecanvas.linecolor = color_choice[0]
+    report_color(color_choice[0])
+
+
+def report_color(textstr) -> None:
+    """Display line color in lower left of canvas."""
+    canvas1.delete('text2')
+    canvas1.create_text(24,
+                     canvas1.height - 10,
+                     fill=textstr,
+                     text=textstr,
+                     tags='text2')
 
 
 def set_linewidth(var):
     """Set line width for canvas.
 
-    parameter: var = the IntVar in adj_linewidth.
+    parameter: var = line width, from the IntVar in adj_linewidth.
     """
     canvas1.linewidth = var.get()
 
@@ -395,16 +589,11 @@ def open_picture():
 
 def add_image(canv, fpath):
     global im_tk
+
     im = Image.open(fpath)
     imsize = cnv.init_image_size(im, viewport1)
-    # heights.append(imsize['h'])
-    # widths.append(imsize['w'])
     im_resize = im.resize((imsize['w'], imsize['h']))
     im_tk = ImageTk.PhotoImage(im_resize)
-    # myPhotoImages.append(im_tk)
-    # print(f'im w,h: {im.width}, {im.height}')
-    # print(f'imsize w,h: {imsize["w"]}, {imsize["h"]}')
-    # print()
 
     placement = cnv.get_1_posn(viewport1, imsize['w'], imsize['h'],
                                ('center', 'center'))
@@ -415,6 +604,7 @@ def add_image(canv, fpath):
                              anchor=tk.NW,
                              image=im_tk,
                              tag = 'image1')
+    # any reason to do this?
     # canv.update()
 
 
@@ -424,18 +614,44 @@ def set_center(ev):
 
 
 def select_shape(event):
-    found = canvas1.find_closest(event.x, event.y, halo=25)
+    # found = canvas1.find_closest(event.x, event.y, halo=25)
+    found = myshapecanvas.find_closest(event.x, event.y, halo=25)
     if len(found) > 0:
-        canvas1.selected = found[0]
-        canvas1.itemconfigure(canvas1.selected, fill='orange')
-        itemtag = canvas1.itemcget(canvas1.selected, 'tag')
-        print(f'itemtag: {itemtag}')
+        # canvas1.selected = found[0]
+        # canvas1.itemconfigure(canvas1.selected, fill='orange')
+        # itemtag = canvas1.itemcget(canvas1.selected, 'tag')
+        myshapecanvas.selected = found[0]
+
+        # remove highlight from all shapes
+        print(f'shapetags: {myshapecanvas.shapetags}')
+        for n, item in enumerate(myshapecanvas.shapetags):
+            # TODO: this should be updated when color fills are implemented
+            # print(n, item)
+            myshapecanvas.itemconfigure(item, fill='cyan')
+        # highlight selected shape
+        myshapecanvas.itemconfigure(myshapecanvas.selected, fill='#ffa')
+    else:
+        print('object not found')
 
 
 root = tk.Tk()
 
-canvas1 = Sketchpad(root, width=640, height=640, background='#ccc', mode='shapes')
+canvas1 = Sketchpad(root,
+                    width=640,
+                    height=640,
+                    background='#ccc',
+                    mode='shapes',
+                    linewidth=1)
 canvas1.bind('<Button-3>', lambda event: select_shape(event))
+
+myshapecanvas = ShapeCanvas(root,
+                            width=400,
+                            height=500,
+                            background='cyan',
+                            mode='shapes')
+myshapecanvas.bind('<Button-3>', lambda event: select_shape(event))
+
+
 
 num_colors = 8  # not used yet
 colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'magenta', 'black']
@@ -447,13 +663,6 @@ for n, x in enumerate(xs):
     colorbar.create_rectangle(x, y1, x + 40, y2, fill=colors[n], tags=colors[n])  # + str(n))
 
 colorbar.bind('<1>', set_color)
-
-#   tk Frames:
-#       - For a visible border, use 'relief' and 'border' attributes
-#       - can use 'highlightthickness' and 'highlightbackground' attributes
-#   ttk Frames:
-#       - For a visible border, use 'relief' and 'padding' attributes
-#       - 'padding' is internal to the Frame
 
 linewidths = [str(i) for i in list(range(1, 11))]
 
@@ -495,8 +704,6 @@ center_posn = {'x': 0, 'y': 0}
 open_button = tk.Button(root, text="Open Image", command=open_picture)
 
 circle = ttk.Button(root, text='circle', name='circle', cursor='arrow')#, command=lambda w=circle: set_shape(w))
-# circle.bind('<Button-1>', lambda ev, cp=center_posn: set_center(ev, cp))
-# print(circle.winfo_name())
 
 # ---------- END controls
 
@@ -507,18 +714,20 @@ btnq = ttk.Button(quit_fr,
                   style="MyButton1.TButton")
 
 canvas1.grid(column=0, row=3)
-canvas1.grid(column=0, row=3)
+myshapecanvas.grid(column=1, row=3)
 controls.grid(column=0, row=4, sticky='ew')
 colorbar.grid(column=0, row=5, pady=10)
 open_button.grid(column=0, row=6, pady=10)
 circle.grid(column=0, row=7)
 
-# btnq.grid(column=0,           row=6, ipady=10)
 btnq.pack()
 quit_fr.grid(column=0, row=8, pady=10)
 
-# canvas1.update()
-# print(f'size of canvas1: {canvas1.winfo_width()}, {canvas1.winfo_height()}')
+canvas1.update()
+print(f'size of canvas1: {canvas1.winfo_width()}, {canvas1.winfo_height()}')
+
+myshapecanvas.update()
+print(f'size of myshapecanvas: {myshapecanvas.winfo_width()}, {myshapecanvas.winfo_height()}')
 
 # colorbar.update()
 # print(f'size of colorbar: {colorbar.winfo_width()}')
