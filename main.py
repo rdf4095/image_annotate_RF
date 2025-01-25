@@ -26,10 +26,13 @@ history:
             are children. Streamline __init__ functions and variables, but
             keep old and superfluous code, commented-out, to document what
             was done.
-01-21-2025  Remove commented-out code. Add ShapeCanvas attribute shape_centers
+01-21-2025  Remove commented-out code. Add ShapeCanvas attribute: shape_centers
             for correctly dragging and resizing any selected shape.
+01-22-2025  Update function docstrings.
+01-25-2025  Switch to Google-style class & __init__ docstrings.
+            Update many method docstrings with more standardized text.
 """
-# TODO: 2) in drag_shape(), use modifier key to constrain horizontal / vertical
+# TODO: in drag_shape(), use modifier key to constrain horizontal / vertical movement
 
 from PIL import Image, ImageTk
 
@@ -41,6 +44,31 @@ cnv = SourceFileLoader("cnv", "../image_display_RF/canvas_ui.py").load_module()
 
 
 class MyCanvas(tk.Canvas):
+    """
+    MyCanvas : Defines a tk Canvas with some default attributes.
+
+    The canvas reports the current cursor location, and keeps track of L-mouse
+    clicked locations.
+
+    Extends: tk.Canvas
+
+    Attributes:
+        firstx (int): x location of initial L-click
+        firsty (int): y location of initial L-click
+
+        startx (int): x location of L-click
+        starty (int): y location of L-click
+
+        previousx (int): x location of prevoius L-click
+        previousy (int): y location of prevoius L-click
+
+        points (list of int): list of x,y locations
+
+    Methods:
+        report_posn: display x,y cursor location as text
+        clear_posn: delete cursor location text
+        set_start: upon L-mouse click, store x,y cursor location
+    """
     def __init__(self, parent,
                  mode='',
                  linewidth=1,
@@ -48,6 +76,16 @@ class MyCanvas(tk.Canvas):
                  height=320,
                  background='#ffa',
                  ):
+        """
+        Creates an instance of the MyCanvas object.
+
+        Args:
+            mode (str): Type of interaction with canvas, e.g. drawing lines
+            linewidth (int): Width of line for creating lines and shapes
+            width (int): Width of the canvas in pixels
+            height (int): Height of the canvas in pixels
+            background (str): Canvas background color
+        """
         self.mode = mode
         self.linewidth = linewidth
         self.width = width
@@ -72,8 +110,9 @@ class MyCanvas(tk.Canvas):
             thispoint.yval = yval
         self.Point = type('Point', (), {"__init__": point_init})
 
+
     def report_posn(self, event) -> None:
-        """Display cursor position in lower right of canvas."""
+        """Display x,y cursor position in lower right of canvas."""
         self.delete('text1')
         self.create_text(self.width - 24,
                          self.height - 10,
@@ -102,47 +141,46 @@ class MyCanvas(tk.Canvas):
         self.startx, self.starty = event.x, event.y
 
         if self.mode == 'lines':
+            print(f'Point is a {type(self.Point)}')
             self.points.append(self.Point(event.x, event.y))
-            # print(f'point added: {self.points[-1].xval},{self.points[-1].yval}')
 
 
 class DrawCanvas(MyCanvas):
     """
-    DrawCanvas : Defines a Canvas for interactive drawing.
+    DrawCanvas : Defines a tk Canvas for interactive drawing.
 
-    Extends: tk.Canvas
+    As indicated by the 'mode' argument, the user can draw freehand by
+    dragging the mouse, or by L-clicking successive points to create connected
+    lines, and R-clicking to successively remove existing lines.
 
-    Attributes
-    ----------
+    Extends: MyCanvas
 
-    Methods
-    -------
-    method_1:
-        text
+    Methods:
+        draw_line:
+        double_click:
+        undo_line:
+        draw_path:
     """
-
     def __init__(self, parent,
                  mode='lines',
                  linewidth=1,
                  **kwargs
                  ):
-        # self.__dict__.update(kwargs)
         """
-        Initializess a DrawCanvas object.
+        Creates an instance of the DrawCanvas object.
 
-        Parameters
-        ----------
-        width : Int
-            Canvas width.
-        height : Int
-            Canvas height.
+        Args:
+            mode (str): Type of interaction with canvas, e.g. drawing lines
+            linewidth (int): Width of line for creating lines and shapes
+            width (int): Width of the canvas in pixels
+            height (int): Height of the canvas in pixels
+            background (str): Canvas background color
 
-        Methods
-        -------
-        point_init:
-            Defines a Point object for x-y Canvas position.
+        Attributes:
+            linecolor (str): color of line created on the canvas
+            line_count (int): number of lines created
+            linetags (list of str): list of tags for each line object
         """
-
         self.mode = mode
         self.linewidth = linewidth
         self.width = kwargs.get('width')
@@ -150,10 +188,7 @@ class DrawCanvas(MyCanvas):
         self.background = kwargs.get('background')
 
         super().__init__(parent, mode='lines', width=self.width, height=self.height, background=self.background)
-        # super().__init__(parent)
 
-        # print(f'in DrawCanvas, mode is {self.mode}')
-        # print(f'in DrawCanvas, linewidth is {self.linewidth}')
         self.linecolor = 'black'
         self.line_count = 0
         self.linetags = []
@@ -166,29 +201,13 @@ class DrawCanvas(MyCanvas):
                 self.bind('<Button-1>', self.draw_line)
                 self.bind('<Double-1>', self.double_click)
                 self.bind('<Button-3>', self.undo_line)
-            # case 'shapes':
-            #     self.bind('<Button-1>', self.set_shape)
-            #     self.bind('<Shift-Motion>', self.drag_shape)
-            #     self.bind('<Control-Motion>', self.expand_shape)
-            #     self.bind('<Alt-Motion>', self.contract_shape)
-
-                # use scrollwheel if available (also works for middle mouse button
-                # plus trackbutton on ThinkPad):
-                # self.bind('<Button-4>', self.expand_shape)
-                # self.bind('<Button-5>', self.contract_shape)
-
-                # self.master.bind('<Shift-Up>', lambda ev, h=0, v=-1: self.nudge_shape(ev, h, v))
-                # self.master.bind('<Shift-Down>', lambda ev, h=0, v=1: self.nudge_shape(ev, h, v))
-                # self.master.bind('<Shift-Left>', lambda ev, h=-1, v=0: self.nudge_shape(ev, h, v))
-                # self.master.bind('<Shift-Right>', lambda ev, h=1, v=0: self.nudge_shape(ev, h, v))
 
 
     def draw_line(self, event) -> None:
-        """Handler for L-mouse click when drawing lines. If past the starting
+        """Handler for L-mouse click when drawing lines.
 
-        position, draw a line from last posn to current posn.
+        If past the starting position, draw a line from last posn to current posn.
         """
-        # print('in draw_line...')
         if self.firstx == 0 and self.firsty == 0:
             self.set_start(event)
             return
@@ -203,6 +222,7 @@ class DrawCanvas(MyCanvas):
 
         self.linetags.append(tagname)
         self.set_start(event)
+
 
     def double_click(self, event) -> None:
         """Handler for L mouse double-click, in line mode. First, the single-click
@@ -230,29 +250,29 @@ class DrawCanvas(MyCanvas):
         self.points = []
         self.linetags = []
 
+
     def undo_line(self, event) -> None:
-        """Handler for R-mouse click. In line mode, remove last line and make
-        previous cursor position the current position for connecting new lines.
+        """Handler for R-mouse click, when drawing lines.
+
+        In line mode, remove last line and make previous cursor position the
+        current position for connecting new lines.
         """
         if (self.firstx, self.firsty) == (0, 0):
             return
 
         if len(self.linetags) > 0:
-            # print(f'linetags: {self.linetags}')
             self.delete(self.linetags[-1])
             self.linetags.pop()
         if len(self.points) > 0:
-            # print(f'points: {self.points}')
             self.points.pop()
             if len(self.points) >= 1:
                 self.startx, self.starty = self.points[-1].xval, self.points[-1].yval
 
-    def draw_path(self, event) -> None:
-        """Draw a path following the cursor.
 
-        """
-        x_threshold = 10
-        y_threshold = 10
+    def draw_path(self, event) -> None:
+        """Draw a path following the cursor, when drawing lines."""
+        # x_threshold = 10
+        # y_threshold = 10
 
         # both thresholds: simulate jagged lines in both directions
         # if (abs(event.x - self.startx) >= x_threshold and abs(event.y - self.starty) >= y_threshold):
@@ -284,50 +304,6 @@ class DrawCanvas(MyCanvas):
         self.report_posn(event)
         self.set_start(event)
 
-    # def create_shape(self,
-    #                  start,
-    #                  end,
-    #                  shape='oval',
-    #                  linecolor='black',
-    #                  width=1,
-    #                  tag='oval'):
-    #     id1 = None
-    #
-    #     match shape:
-    #         case 'oval':
-    #             taglist = ['oval', tag]
-    #             id1 = self.create_oval(start,
-    #                                    end,
-    #                                    outline=linecolor,
-    #                                    width=width,
-    #                                    tags=taglist)
-    #             # w = self.itemcget('width')
-    #             # print(f'')
-    #         case _:
-    #             pass
-    #
-    #     return id1
-
-
-    # def set_shape(self, event):
-    #     set_center(event)
-    #
-    #     xwidth, ywidth = 20.0, 20.0
-    #     self.set_start(event)
-    #
-    #     start_posn = self.startx - xwidth, self.starty - ywidth
-    #     end_posn = self.startx + xwidth, self.starty + ywidth
-    #     this_tag = self.next_shape + str(len(self.shapetags) + 1)
-    #     id1 = self.create_shape(start_posn,
-    #                             end_posn,
-    #                             shape=self.next_shape,
-    #                             linecolor=self.linecolor,
-    #                             width=self.linewidth,
-    #                             tag=this_tag)
-    #     if id1 is not None:
-    #         self.shapetags.append(this_tag)
-    #         self.selected = id1
-
         # get attributes
         # --------------
         # outline = self.itemcget(id1, 'outline')
@@ -337,70 +313,43 @@ class DrawCanvas(MyCanvas):
         # OR:
         # self.find_withtag('oval')
 
-
-    # def drag_shape(self, event):
-    #     dx = 0
-    #     dy = 0
-    #     shift = 1
-    #     # theshape = self.shapetags[-1]
-    #     theshape = self.selected
-    #     print('in DrawCanvas drag_shape')
-    #     if event.x > self.previousx: dx = shift
-    #     if event.x < self.previousx: dx = -shift
-    #     if event.y > self.previousy: dy = shift
-    #     if event.y < self.previousy: dy = -shift
-    #
-    #     self.previousx = event.x
-    #     self.previousy = event.y
-    #
-    #     center_posn['x'] += dx
-    #     center_posn['y'] += dy
-    #
-    #     self.move(theshape, dx, dy)
-    #
-    #
-    # def nudge_shape(self, event, dx, dy):
-    #     # print(f'in nudge_shape, ev: {event}')
-    #     canvas1.focus_set()
-    #     theshape = self.shapetags[-1]
-    #     self.move(theshape, dx, dy)
-    #
-    #
-    # def expand_shape(self, event):
-    #     # global center_posn
-    #     # theshape = self.shapetags[-1]
-    #     theshape = self.selected
-    #     self.scale(theshape, center_posn['x'], center_posn['y'], 1.01, 1.01)
-    #
-    #
-    # def contract_shape(self, event):
-    #     # theshape = self.shapetags[-1]
-    #     theshape = self.selected
-    #     # print(f'contractint {theshape}')
-    #
-    #     self.scale(theshape, center_posn['x'], center_posn['y'], 0.99, 0.99)
-
 # END Class DrawCanvas ==========
 
 class ShapeCanvas(MyCanvas):
+    """
+
+    """
     def __init__(self, parent,
                  linewidth=1,
                  **kwargs
                  ):
         self.__dict__.update(kwargs)
-
         """
-        Initializes a ShapeCanvas object.
+        Creates an instance of the ShapeCanvas object.
 
-        Parameters
-        ----------
-        width : Int
-            Canvas width.
-        height : Int
-            Canvas height.
+        Args:
+            mode (str): Type of interaction with canvas, e.g. drawing lines
+            linewidth (int): Width of line for creating lines and shapes
+            width (int): Width of the canvas in pixels
+            height (int): Height of the canvas in pixels
+            background (str): Canvas background color
 
-        Methods
-        -------
+        Attributes:
+            linecolor (str): color of line created on the canvas
+            shapetags (list of str): list of the tags for each shape object
+            shape_centers (list of tuple): list of x,y locations for the center of each shape
+            next_shape (str): name of the next shape to be added
+            selected (int): id of the current shape object
+        
+        Methods:
+            create_shape
+            set_shape
+            drag_shape
+            expand_shape
+            contract_shape
+            nudge_shape
+            select_shape
+
         """
 
         self.linewidth = linewidth
@@ -413,8 +362,6 @@ class ShapeCanvas(MyCanvas):
         # print(f'test: {self.test}')      # = None
 
         super().__init__(parent, width=self.width, height=self.height, background=self.background)
-
-        # print(f'in ShapeCanvas, mode is {self.mode}')
 
         self.linecolor = 'black'
         self.shapetags = []
@@ -432,6 +379,7 @@ class ShapeCanvas(MyCanvas):
         self.master.bind('<Shift-Left>', lambda ev, h=-1, v=0: self.nudge_shape(ev, h, v))
         self.master.bind('<Shift-Right>', lambda ev, h=1, v=0: self.nudge_shape(ev, h, v))
         self.master.bind('<Button-3>', lambda ev: self.select_shape(ev))
+
 
     def create_shape(self,
                      start,
@@ -457,6 +405,11 @@ class ShapeCanvas(MyCanvas):
 
 
     def set_shape(self, event):
+        """Handler for L-mouse button when drawing shapes.
+
+        This function sets up parameters, calls create_shape(), and manages
+        the list of existing shape objects.
+        """
         set_center(event)
 
         xwidth, ywidth = 20.0, 20.0
@@ -488,10 +441,11 @@ class ShapeCanvas(MyCanvas):
 
 
     def drag_shape(self, event):
+        """Handler for L-mouse drag to move a shape object on the canvas."""
         dx = 0
         dy = 0
         shift = 1
-        # theshape = self.shapetags[-1]
+
         theshape = self.selected
         this_tag = self.gettags(theshape)[1]
         this_index = self.shapetags.index(this_tag)
@@ -513,14 +467,20 @@ class ShapeCanvas(MyCanvas):
 
 
     def nudge_shape(self, event, dx, dy):
-        # print(f'in nudge_shape, ev: {event}')
+        """Move the selected shape object by one pixel.
+
+        Direction of movement is determined by the arrow key pressed.
+        """
         mydrawcanvas.focus_set()
-        # theshape = self.shapetags[-1]
         theshape = self.selected
         self.move(theshape, dx, dy)
 
 
     def expand_shape(self, event):
+        """Handler for L-mouse button + CONTROL key to modify a shape object.
+
+        Interactively enlarges the selected shape.
+        """
         # global center_posn
         # theshape = self.shapetags[-1]
         theshape = self.selected
@@ -532,6 +492,10 @@ class ShapeCanvas(MyCanvas):
 
 
     def contract_shape(self, event):
+        """Handler for L-mouse button + ALT key to modify a shape object.
+
+        Interactively reduces the size of the selected shape.
+        """
         # theshape = self.shapetags[-1]
         theshape = self.selected
         this_tag = self.gettags(theshape)[1]
@@ -542,7 +506,11 @@ class ShapeCanvas(MyCanvas):
 
 
     def select_shape(self, event):
-        """Make the shape near the cursor the 'selected' shape, and highlight it."""
+        """Make the shape near the cursor the 'selected' shape.
+
+        The shape is highlighted with a color fill. A class attribute keeps
+        track of the currently selected shape, by its id.
+        """
         found = self.find_closest(event.x, event.y, halo=25)
         if len(found) > 0:
             self.selected = found[0]
@@ -551,6 +519,8 @@ class ShapeCanvas(MyCanvas):
             # print(f'shapetags: {self.shapetags}')
             for n, item in enumerate(self.shapetags):
                 self.itemconfigure(item, fill='orange')
+
+            # highlight the seleced shape
             self.itemconfigure(self.selected, fill='#ffa')
         else:
             print('object not found')
@@ -560,7 +530,7 @@ class ShapeCanvas(MyCanvas):
 file_path = ''
 
 def set_color(event):
-    """Set drawing color for canvas."""
+    """Set color for lines drawn on a canvas."""
     color_choice = colorbar.gettags('current')[0]
     mydrawcanvas.linecolor = color_choice
     myshapecanvas.linecolor = color_choice
@@ -588,6 +558,7 @@ def set_linewidth(var):
 
 
 def open_picture():
+    """Manage user selection of an image file, for display in a canvas."""
     global file_path
 
     file_path = filedialog.askopenfilename(title="Select Image File",
@@ -599,6 +570,7 @@ def open_picture():
 
 
 def add_image(canv, fpath):
+    """Display an image in a canvas."""
     global im_tk
 
     im = Image.open(fpath)
@@ -616,7 +588,7 @@ def add_image(canv, fpath):
                              image=im_tk,
                              tag = 'image1')
 
-    # any reason to do this?
+    # Updates actual size of the canvas; any reason to do this here?
     # canv.update()
 
 
@@ -637,6 +609,17 @@ mydrawcanvas = DrawCanvas(root,
                           height=640,
                           background='#ccc'
                           )
+#
+# practice retrieving class info
+
+print('-------------------------------------------------------')
+print(f'{mydrawcanvas.__doc__}')
+print('-------------------------------------------------------')
+
+import inspect
+
+print(f'{inspect.getdoc(MyCanvas)}')
+
 
 myshapecanvas = ShapeCanvas(root,
                             # mode='shapes',
@@ -645,6 +628,7 @@ myshapecanvas = ShapeCanvas(root,
                             height=500,
                             background='cyan'
                             )
+# no londer needed?
 # myshapecanvas.bind('<Button-3>', lambda event: self.select_shape(event))
 
 
@@ -690,10 +674,9 @@ adj_linewidth = ttk.Spinbox(controls,
 
 adj_linewidth.pack(side='right', pady=5)
 lw.pack(side='right', padx=5)
-# ---------- END canvas interaction
+# ---------- END controls for canvas interaction
 
-# shape controls
-# --------------
+# shape controls --------------
 shape_value = 'default'
 shape_var = tk.StringVar(value=shape_value)
 center_posn = {'x': 0, 'y': 0}
@@ -719,10 +702,10 @@ circle.grid(column=0, row=7)
 btnq.pack()
 quit_fr.grid(column=0, row=8, pady=10)
 
-mydrawcanvas.update()
+# mydrawcanvas.update()
 # print(f'size of mydrawcanvas: {mydrawcanvas.winfo_width()}, {mydrawcanvas.winfo_height()}')
 
-myshapecanvas.update()
+# myshapecanvas.update()
 # print(f'size of myshapecanvas: {myshapecanvas.winfo_width()}, {myshapecanvas.winfo_height()}')
 
 # colorbar.update()
