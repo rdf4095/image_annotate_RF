@@ -29,8 +29,10 @@ history:
 01-21-2025  Remove commented-out code. Add ShapeCanvas attribute: shape_centers
             for correctly dragging and resizing any selected shape.
 01-22-2025  Update function docstrings.
-01-25-2025  Switch to Google-style class & __init__ docstrings.
+01-25-2025  Switch to Google-style class docstrings.
             Update many method docstrings with more standardized text.
+01-31-2025  Add function toggle_selection to manage the selected shape object.
+            Remove attribute linewidth from base class MyCanvas.
 """
 # TODO: in drag_shape(), use modifier key to constrain horizontal / vertical movement
 
@@ -70,8 +72,7 @@ class MyCanvas(tk.Canvas):
         set_start: upon L-mouse click, store x,y cursor location
     """
     def __init__(self, parent,
-                 mode='',
-                 linewidth=1,
+                 # mode='',
                  width=320,
                  height=320,
                  background='#ffa',
@@ -86,8 +87,7 @@ class MyCanvas(tk.Canvas):
             height (int): Height of the canvas in pixels
             background (str): Canvas background color
         """
-        self.mode = mode
-        self.linewidth = linewidth
+        # self.mode = mode
         self.width = width
         self.height = height
         self.background = background
@@ -114,8 +114,18 @@ class MyCanvas(tk.Canvas):
     def report_posn(self, event) -> None:
         """Display x,y cursor position in lower right of canvas."""
         self.delete('text1')
-        self.create_text(self.width - 24,
-                         self.height - 10,
+        self.update()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        # print(f'w,h: {self.width}, {self.height}, ---- {self.winfo_width()}, {self.winfo_height()}')
+        # self.create_text(self.width - 24,
+        #                  self.height - 10,
+        #                  fill='blue',
+        #                  text=str(event.x) + ',' + str(event.y),
+        #                  tags='text1')
+
+        self.create_text(width - 24,
+                         height - 10,
                          fill='blue',
                          text=str(event.x) + ',' + str(event.y),
                          tags='text1')
@@ -140,20 +150,29 @@ class MyCanvas(tk.Canvas):
 
         self.startx, self.starty = event.x, event.y
 
-        if self.mode == 'lines':
-            print(f'Point is a {type(self.Point)}')
-            self.points.append(self.Point(event.x, event.y))
+        # if self.mode == 'lines':
+        #     # print(f'Point is a {type(self.Point)}')
+        #     self.points.append(self.Point(event.x, event.y))
+        self.points.append(self.Point(event.x, event.y))
+
+# END Class MyCanvas ==========
+
 
 
 class DrawCanvas(MyCanvas):
     """
-    DrawCanvas : Defines a tk Canvas for interactive drawing.
+    DrawCanvas : a tk Canvas for interactive drawing.
 
-    As indicated by the 'mode' argument, the user can draw freehand by
-    dragging the mouse, or by L-clicking successive points to create connected
-    lines, and R-clicking to successively remove existing lines.
+    As indicated by the 'mode' argument, the user can either 1) draw freehand by
+    L-dragging the mouse, or 2) L-click successive points to create connected
+    lines, and R-click to successively remove existing lines.
 
     Extends: MyCanvas
+
+    Attributes:
+        linecolor (str): color of line created on the canvas
+        line_count (int): number of lines created
+        linetags (list of str): list of tags for each line object
 
     Methods:
         draw_line:
@@ -163,7 +182,7 @@ class DrawCanvas(MyCanvas):
     """
     def __init__(self, parent,
                  mode='lines',
-                 linewidth=1,
+                 # linewidth=1,
                  **kwargs
                  ):
         """
@@ -175,19 +194,16 @@ class DrawCanvas(MyCanvas):
             width (int): Width of the canvas in pixels
             height (int): Height of the canvas in pixels
             background (str): Canvas background color
-
-        Attributes:
-            linecolor (str): color of line created on the canvas
-            line_count (int): number of lines created
-            linetags (list of str): list of tags for each line object
         """
         self.mode = mode
-        self.linewidth = linewidth
+        # self.linewidth = linewidth
+        self.linewidth = kwargs.get('linewidth')
         self.width = kwargs.get('width')
         self.height = kwargs.get('height')
         self.background = kwargs.get('background')
 
-        super().__init__(parent, mode='lines', width=self.width, height=self.height, background=self.background)
+        # super().__init__(parent, mode='lines', width=self.width, height=self.height, background=self.background)
+        super().__init__(parent, width=self.width, height=self.height, background=self.background)
 
         self.linecolor = 'black'
         self.line_count = 0
@@ -195,9 +211,11 @@ class DrawCanvas(MyCanvas):
 
         match self.mode:
             case 'freehand':
+                print('    binding freehand...')
                 self.bind('<Button-1>', self.set_start)
+                self.bind('<Button1-Motion>', self.draw_line)
             case 'lines':
-                print('    binding...')
+                print('    binding lines...')
                 self.bind('<Button-1>', self.draw_line)
                 self.bind('<Double-1>', self.double_click)
                 self.bind('<Button-3>', self.undo_line)
@@ -239,7 +257,6 @@ class DrawCanvas(MyCanvas):
                          width=self.linewidth,
                          tags=tagname)
         self.linetags.append(tagname)
-        print(f'linetags: {self.linetags}')
 
         # try (don't think this is necessary)
         # self.startx, self.starty = self.previousx, self.previousy
@@ -315,15 +332,38 @@ class DrawCanvas(MyCanvas):
 
 # END Class DrawCanvas ==========
 
+
+
 class ShapeCanvas(MyCanvas):
     """
+    ShapeCanvas : a tk Canvas for creating image annotations.
 
+    The user can select an image to display. Shapes (oval, rectangle, etc.) can
+    be added to annotate the image, and these can be resized or moved.
+
+    Extends: MyCanvas
+
+    Attributes:
+        linecolor (str): color of line created on the canvas
+        shapetags (list of str): list of the tags for each shape object
+        shape_centers (list of tuple): list of x,y locations for the center of each shape
+        next_shape (str): name of the next shape to be added
+        selected (int): id of the current shape object
+
+    Methods:
+        create_shape:
+        set_shape:
+        drag_shape:
+        expand_shape:
+        contract_shape:
+        nudge_shape:
+        select_shape:
     """
     def __init__(self, parent,
-                 linewidth=1,
+                 # linewidth=1,
                  **kwargs
                  ):
-        self.__dict__.update(kwargs)
+        # self.__dict__.update(kwargs)
         """
         Creates an instance of the ShapeCanvas object.
 
@@ -333,29 +373,13 @@ class ShapeCanvas(MyCanvas):
             width (int): Width of the canvas in pixels
             height (int): Height of the canvas in pixels
             background (str): Canvas background color
-
-        Attributes:
-            linecolor (str): color of line created on the canvas
-            shapetags (list of str): list of the tags for each shape object
-            shape_centers (list of tuple): list of x,y locations for the center of each shape
-            next_shape (str): name of the next shape to be added
-            selected (int): id of the current shape object
-        
-        Methods:
-            create_shape
-            set_shape
-            drag_shape
-            expand_shape
-            contract_shape
-            nudge_shape
-            select_shape
-
         """
 
-        self.linewidth = linewidth
-        # self.width = kwargs.get('width')
-        # self.height = kwargs.get('height')
-        # self.background = kwargs.get('background')
+        # self.linewidth = linewidth
+        self.linewidth = kwargs.get('linewidth')
+        self.width = kwargs.get('width')
+        self.height = kwargs.get('height')
+        self.background = kwargs.get('background')
 
         # if an expected argument is not passed:
         # self.test = kwargs.get('test')
@@ -378,7 +402,7 @@ class ShapeCanvas(MyCanvas):
         self.master.bind('<Shift-Down>', lambda ev, h=0, v=1: self.nudge_shape(ev, h, v))
         self.master.bind('<Shift-Left>', lambda ev, h=-1, v=0: self.nudge_shape(ev, h, v))
         self.master.bind('<Shift-Right>', lambda ev, h=1, v=0: self.nudge_shape(ev, h, v))
-        self.master.bind('<Button-3>', lambda ev: self.select_shape(ev))
+        self.master.bind('<Button-3>', lambda ev: self.toggle_selection(ev))
 
 
     def create_shape(self,
@@ -412,6 +436,7 @@ class ShapeCanvas(MyCanvas):
         """
         set_center(event)
 
+        # these values should be user preferences, not hard-coded here.
         xwidth, ywidth = 20.0, 20.0
         self.set_start(event)
 
@@ -461,7 +486,6 @@ class ShapeCanvas(MyCanvas):
 
         center_posn['x'] += dx
         center_posn['y'] += dy
-        # print(f"ending center: {center_posn['x']}, {center_posn['y']}")
 
         self.move(theshape, dx, dy)
 
@@ -481,8 +505,7 @@ class ShapeCanvas(MyCanvas):
 
         Interactively enlarges the selected shape.
         """
-        # global center_posn
-        # theshape = self.shapetags[-1]
+        if self.selected is None: return
         theshape = self.selected
         this_tag = self.gettags(theshape)[1]
         this_index = self.shapetags.index(this_tag)
@@ -496,7 +519,7 @@ class ShapeCanvas(MyCanvas):
 
         Interactively reduces the size of the selected shape.
         """
-        # theshape = self.shapetags[-1]
+        if self.selected is None: return
         theshape = self.selected
         this_tag = self.gettags(theshape)[1]
         this_index = self.shapetags.index(this_tag)
@@ -505,20 +528,43 @@ class ShapeCanvas(MyCanvas):
         self.scale(theshape, center_posn['x'], center_posn['y'], 0.99, 0.99)
 
 
-    def select_shape(self, event):
-        """Make the shape near the cursor the 'selected' shape.
+    def toggle_selection(self, event):
+        """Assign one shape to be the currently selected shape."""
+        # If Shift key, un-select everything and return
+        if event.state == 1:
+            self.unselect_shape(event)
+        else:
+            self.select_shape(event)
 
-        The shape is highlighted with a color fill. A class attribute keeps
-        track of the currently selected shape, by its id.
+
+    def unselect_shape(self, event):
+        """Handler for Shift + R-mouse click to unselect a shape.
+
+        The selected shape reverts to the last shape created.
+        """
+        for n, item in enumerate(self.shapetags):
+            self.itemconfigure(item, fill='')
+
+            # reset selected item to be the last created
+            lastid = self.find_withtag(self.shapetags[-1])[0]
+            # print(f'last id, now selected: {lastid}')
+            self.selected = lastid
+
+
+    def select_shape(self, event):
+        """Handler for R-mouse click to select the shape nearest the cursor.
+
+        Makes the shape nearest the cursor, the 'selected' shape. A class
+        attribute keeps track of the currently selected shape, by its id. The
+        shape is highlighted with a color fill.
         """
         found = self.find_closest(event.x, event.y, halo=25)
         if len(found) > 0:
             self.selected = found[0]
 
             # remove highlight from all shapes
-            # print(f'shapetags: {self.shapetags}')
-            for n, item in enumerate(self.shapetags):
-                self.itemconfigure(item, fill='orange')
+            # for n, item in enumerate(self.shapetags):
+            #     self.itemconfigure(item, fill='')
 
             # highlight the seleced shape
             self.itemconfigure(self.selected, fill='#ffa')
@@ -529,24 +575,24 @@ class ShapeCanvas(MyCanvas):
 
 file_path = ''
 
-def set_color(event):
-    """Set color for lines drawn on a canvas."""
+def set_color(event, canvaslist):
+    """Set color for lines drawn on canvases."""
     color_choice = colorbar.gettags('current')[0]
-    mydrawcanvas.linecolor = color_choice
-    myshapecanvas.linecolor = color_choice
-    report_color(color_choice)
+
+    for canv in canvaslist:
+        canv.linecolor = color_choice
+        report_color(canv, color_choice)
 
 
-def report_color(textstr) -> None:
+def report_color(canv, textstr) -> None:
     """Display line color in lower left of canvas."""
-    mydrawcanvas.delete('text2')
-    mydrawcanvas.create_text(10,
-                             mydrawcanvas.height - 10,
-                             fill=textstr,
-                             text=textstr,
-                             anchor='w',
-                             # justify='left',
-                             tags='text2')
+    canv.delete('text2')
+    canv.create_text(10,
+                     canv.height - 10,
+                     fill=textstr,
+                     text=textstr,
+                     anchor='w',
+                     tags='text2')
 
 
 def set_linewidth(var):
@@ -554,6 +600,7 @@ def set_linewidth(var):
 
     parameter: var = line width, from the IntVar in adj_linewidth.
     """
+    # print(f'in set_linewidth, get: {var.get()}')
     mydrawcanvas.linewidth = var.get()
 
 
@@ -566,7 +613,8 @@ def open_picture():
                                            filetypes=[("PNG files",'*.png'),
                                                       ("JPEG file",'*.jpeg')])
 
-    add_image(mydrawcanvas, file_path)
+    # add_image(mydrawcanvas, file_path)
+    add_image(myshapecanvas, file_path)
 
 
 def add_image(canv, fpath):
@@ -604,33 +652,20 @@ im_tk = None
 
 mydrawcanvas = DrawCanvas(root,
                           mode='lines',
-                          linewidth=1,
+                          # linewidth=1,
                           width=640,
                           height=640,
                           background='#ccc'
                           )
-#
-# practice retrieving class info
-
-print('-------------------------------------------------------')
-print(f'{mydrawcanvas.__doc__}')
-print('-------------------------------------------------------')
-
-import inspect
-
-print(f'{inspect.getdoc(MyCanvas)}')
-
 
 myshapecanvas = ShapeCanvas(root,
-                            # mode='shapes',
-                            linewidth=1,
+                            # linewidth=1,
                             width=400,
                             height=500,
                             background='cyan'
                             )
 # no londer needed?
 # myshapecanvas.bind('<Button-3>', lambda event: self.select_shape(event))
-
 
 num_colors = 8  # not used yet
 
@@ -642,11 +677,20 @@ colorbar = tk.Canvas(root, width=320, height=40)
 for n, x in enumerate(xs):
     colorbar.create_rectangle(x, y1, x + 40, y2, fill=colors[n], tags=colors[n])  # + str(n))
 
-colorbar.bind('<1>', set_color)
+# colorbar.bind('<1>', set_color)
+colorbar.bind('<1>', lambda ev, canv=[mydrawcanvas, myshapecanvas]: set_color(ev, canv))
 
 linewidths = [str(i) for i in list(range(1, 11))]
 
-viewport1 = {'w': 640, 'h': 640, 'gutter': 10}
+# can't do this yet, because it isn't displayed
+# myshapecanvas.update()
+# canvas_width = myshapecanvas.winfo_width()
+# canvas_height = myshapecanvas.winfo_height()
+
+# drawcanvas:
+# viewport1 = {'w': 640, 'h': 640, 'gutter': 10}
+# shapecanvas:
+viewport1 = {'w': 400, 'h': 500, 'gutter': 10}
 
 # controls for canvas interaction ----------
 controls = ttk.Frame(root, padding=2, relief='groove')
@@ -710,6 +754,22 @@ quit_fr.grid(column=0, row=8, pady=10)
 
 # colorbar.update()
 # print(f'size of colorbar: {colorbar.winfo_width()}')
+
+
+# practice retrieving class info
+
+# print('-------------------------------------------------------')
+# print(f'{mydrawcanvas.__doc__}')
+# print('-------------------------------------------------------')
+# print()
+
+# import inspect
+#
+# print(f'{inspect.getdoc(MyCanvas)}')
+# print('-------------------------------------------------------------------')
+# print()
+# print(help(MyCanvas))
+
 
 if __name__ == '__main__':
     root.mainloop()
