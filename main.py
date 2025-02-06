@@ -33,8 +33,13 @@ history:
             Update many method docstrings with more standardized text.
 01-31-2025  Add function toggle_selection to manage the selected shape object.
             Remove attribute linewidth from base class MyCanvas.
+02-02-2025  Refine shape selection process.
+02-04-2025  Debug reporting the shape center coordinates when dragging.
 """
+# TODO: use shape attribute 'outline' instead of shape_linecolor
+# TODO: add labels for text report of center and cursor
 # TODO: in drag_shape(), use modifier key to constrain horizontal / vertical movement
+# TODO: ...same for drawing lines
 
 from PIL import Image, ImageTk
 
@@ -124,7 +129,7 @@ class MyCanvas(tk.Canvas):
         #                  text=str(event.x) + ',' + str(event.y),
         #                  tags='text1')
 
-        self.create_text(width - 24,
+        self.create_text(width - 28,
                          height - 10,
                          fill='blue',
                          text=str(event.x) + ',' + str(event.y),
@@ -390,6 +395,7 @@ class ShapeCanvas(MyCanvas):
         self.linecolor = 'black'
         self.shapetags = []
         self.shape_centers = []
+        self.shape_linecolors = []
         self.next_shape = 'oval'
         self.selected = None
 
@@ -443,6 +449,7 @@ class ShapeCanvas(MyCanvas):
         start_posn = self.startx - xwidth, self.starty - ywidth
         end_posn = self.startx + xwidth, self.starty + ywidth
         this_tag = self.next_shape + str(len(self.shapetags) + 1)
+        # print(f'tag created: {this_tag}')
         id1 = self.create_shape(start_posn,
                                 end_posn,
                                 shape=self.next_shape,
@@ -452,17 +459,11 @@ class ShapeCanvas(MyCanvas):
         if id1 is not None:
             self.shapetags.append(this_tag)
             this_center = {'x':self.startx, 'y':self.starty}
+            # print(f'set center: {this_center}')
             self.shape_centers.append(this_center)
+            self.shape_linecolors.append(self.linecolor)
+            self.report_center(this_center, self.linecolor)
             self.selected = id1
-
-        # example of getting attributes
-        # ------------------
-        # outline = self.itemcget(id1, 'outline')
-        # print(f'outline is: {outline}')
-
-        # c = self.find('withtag', 'oval')
-        # OR:
-        # self.find_withtag('oval')
 
 
     def drag_shape(self, event):
@@ -470,8 +471,11 @@ class ShapeCanvas(MyCanvas):
         dx = 0
         dy = 0
         shift = 1
+        self.report_posn(event)
 
         theshape = self.selected
+
+        # print(f'selected at: {self.coords(theshape)}')
         this_tag = self.gettags(theshape)[1]
         this_index = self.shapetags.index(this_tag)
         center_posn = self.shape_centers[this_index]
@@ -484,20 +488,42 @@ class ShapeCanvas(MyCanvas):
         self.previousx = event.x
         self.previousy = event.y
 
-        center_posn['x'] += dx
-        center_posn['y'] += dy
-
         self.move(theshape, dx, dy)
+
+        # center_posn['x'] += dx
+        # center_posn['y'] += dy
+        coords_float = self.coords(theshape)
+        coords = [int(n) for n in coords_float]
+        center_posn['x'] = coords[0] + 20
+        center_posn['y'] = coords[1] + 20
+
+        # TODO: ? this is fast enough to keep up with the drag, but is it the best way ?
+        t = self.gettags(self.selected)[1]
+        whichone = self.shapetags.index(t)
+
+        outline = self.itemcget(self.selected, 'outline')
+        # print(f"center_posn: {center_posn}")
+        self.report_center(center_posn, outline)
 
 
     def nudge_shape(self, event, dx, dy):
         """Move the selected shape object by one pixel.
 
-        Direction of movement is determined by the arrow key pressed.
+        Shift key activates this operation, and the direction of movement is
+        determined by which arrow key is pressed.
         """
         mydrawcanvas.focus_set()
         theshape = self.selected
         self.move(theshape, dx, dy)
+
+        t = self.gettags(theshape)[1]
+        whichone = self.shapetags.index(t)
+        c = self.shape_centers[whichone]
+        c['x'] += dx
+        c['y'] += dy
+
+        outline = self.itemcget(self.selected, 'outline')
+        self.report_center(c, outline)
 
 
     def expand_shape(self, event):
@@ -545,10 +571,11 @@ class ShapeCanvas(MyCanvas):
         for n, item in enumerate(self.shapetags):
             self.itemconfigure(item, fill='')
 
-            # reset selected item to be the last created
-            lastid = self.find_withtag(self.shapetags[-1])[0]
-            # print(f'last id, now selected: {lastid}')
-            self.selected = lastid
+        # set selected item to be the last created
+        lastid = self.find_withtag(self.shapetags[-1])[0]
+        self.itemconfigure(lastid, fill='#ffa')
+        self.after(500, lambda: self.itemconfigure(lastid, fill=''))
+        self.selected = lastid
 
 
     def select_shape(self, event):
@@ -558,18 +585,49 @@ class ShapeCanvas(MyCanvas):
         attribute keeps track of the currently selected shape, by its id. The
         shape is highlighted with a color fill.
         """
+        # remove lighlight from all shapes
+        for n, item in enumerate(self.shapetags):
+            self.itemconfigure(item, fill='')
+
         found = self.find_closest(event.x, event.y, halo=25)
         if len(found) > 0:
             self.selected = found[0]
 
-            # remove highlight from all shapes
-            # for n, item in enumerate(self.shapetags):
-            #     self.itemconfigure(item, fill='')
-
             # highlight the seleced shape
             self.itemconfigure(self.selected, fill='#ffa')
+
+
+
+            t = self.gettags(self.selected)[1]
+            # print(f'tag selected: {t}')
+
+            whichone = self.shapetags.index(t)
+            # print(f'whichone: {whichone}')
+
+            center = self.shape_centers[whichone]
+            # print(f'center: {center}')
+
+            outline = self.itemcget(self.selected, 'outline')
+            # print(f'outline: {outline}')
+
+
+            self.report_center(center, outline)
         else:
-            print('object not found')
+            print('no object found')
+
+
+    def report_center(self, center, color) -> None:
+        self.delete('center_text')
+        textstr = f"center:  {center['x']}, {center['y']}"
+
+        self.create_text(10,
+                         12,
+                         fill=color,
+                         text=textstr,
+                         anchor='w',
+                         tags='center_text')
+
+
 
 # END Class ShapeCanvas ==========
 
@@ -586,13 +644,14 @@ def set_color(event, canvaslist):
 
 def report_color(canv, textstr) -> None:
     """Display line color in lower left of canvas."""
-    canv.delete('text2')
+    canv.delete('color_text')
     canv.create_text(10,
                      canv.height - 10,
                      fill=textstr,
                      text=textstr,
                      anchor='w',
-                     tags='text2')
+                     tags='color_text')
+
 
 
 def set_linewidth(var):
@@ -678,7 +737,7 @@ for n, x in enumerate(xs):
     colorbar.create_rectangle(x, y1, x + 40, y2, fill=colors[n], tags=colors[n])  # + str(n))
 
 # colorbar.bind('<1>', set_color)
-colorbar.bind('<1>', lambda ev, canv=[mydrawcanvas, myshapecanvas]: set_color(ev, canv))
+colorbar.bind('<1>', lambda ev, canv=(mydrawcanvas, myshapecanvas): set_color(ev, canv))
 
 linewidths = [str(i) for i in list(range(1, 11))]
 
