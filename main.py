@@ -10,29 +10,7 @@ author: Russell Folks
 history:
 -------
 01-02-2025  creation
-01-05-2025  Begin adding shape controls.
-01-06-2025  User can select a local image file.
-01-08-2025  Add functions to enlarge or reduce size of a circle object.
-01-09-2025  Add function to drag the current shape to a new location.
-            Commit again.
-01-12-2025  Debug drag function. Add function to nudge the shape 1 pixel.
-            Read line color and line thickness. Move creation of shape object
-            into its own funciton.
-01-16-2025  Create ShapeCanvas as a child class of Sketchpad. drag_shape() now
-            updates center location of the object. Selecting a shape now
-            highlights only that shape.
-01-17-2025  Rename Sketchpad class to DrawCanvas.
-01-18-2025  Define a base class MyCanvas, of which DrawCanvas and ShapeCanvas
-            are children. Streamline __init__ functions and variables, but
-            keep old and superfluous code, commented-out, to document what
-            was done.
-01-21-2025  Remove commented-out code. Add ShapeCanvas attribute: shape_centers
-            for correctly dragging and resizing any selected shape.
-01-22-2025  Update function docstrings.
-01-25-2025  Switch to Google-style class docstrings.
-            Update many method docstrings with more standardized text.
-01-31-2025  Add function toggle_selection to manage the selected shape object.
-            Remove attribute linewidth from base class MyCanvas.
+... [see history.txt]
 02-02-2025  Refine shape selection process.
 02-04-2025  Debug reporting the shape center coordinates when dragging.
 02-08-2025  Add 'constrain' parameter to drag_shape() to drag vertically
@@ -41,8 +19,12 @@ history:
 02-11-2025  Update class headers. Update some function headers.
             Make file_path a local var. Remove old commented-code. Add frame
             for shapecanvas controls. Deactivate set_center().
+02-13-2025  Add buttons to create rectangle or arc on the shape canvas. Change
+            'circle' parameters to 'oval', the tk name of the object.
+02-14-2025  Add controls to set shape width and height.
+02-19-2025  Extract shape controls into tool_classes.py.
+02-20-2025  Use trace_add to detect changes in myshapecanvas Spinbox.
 """
-# TODO: add Frame for each canvas and its controls, to manage spacing
 # TODO: ? option to constrain drawing lines to horizontal / vertical
 
 from PIL import Image, ImageTk
@@ -51,7 +33,9 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from importlib.machinery import SourceFileLoader
 
+import tool_classes as tc
 cnv = SourceFileLoader("cnv", "../image_display_RF/canvas_ui.py").load_module()
+# tc = SourceFileLoader("tc", "./tool_classes.py").load_module()
 
 
 class MyCanvas(tk.Canvas):
@@ -405,17 +389,28 @@ class ShapeCanvas(MyCanvas):
         self.next_shape = 'oval'
         self.selected = None
 
+        self.oval_width = 20
+        self.oval_height = 20
+
         self.bind('<Button-1>', self.set_shape)
         self.bind('<Shift-Motion>', self.drag_shape)
         self.bind('<Alt-Motion>', lambda ev, c=True: self.drag_shape(ev, c))
         self.bind('<Control-Motion>', self.resize_shape)
         # self.bind('<Alt-Motion>', self.contract_shape)
 
-        self.master.bind('<Shift-Up>', lambda ev, h=0, v=-1: self.nudge_shape(ev, h, v))
-        self.master.bind('<Shift-Down>', lambda ev, h=0, v=1: self.nudge_shape(ev, h, v))
-        self.master.bind('<Shift-Left>', lambda ev, h=-1, v=0: self.nudge_shape(ev, h, v))
-        self.master.bind('<Shift-Right>', lambda ev, h=1, v=0: self.nudge_shape(ev, h, v))
-        self.master.bind('<Button-3>', lambda ev: self.toggle_selection(ev))
+        # self.master.bind('<Shift-Up>', lambda ev, h=0, v=-1: self.nudge_shape(ev, h, v))
+        # self.master.bind('<Shift-Down>', lambda ev, h=0, v=1: self.nudge_shape(ev, h, v))
+        # self.master.bind('<Shift-Left>', lambda ev, h=-1, v=0: self.nudge_shape(ev, h, v))
+        # self.master.bind('<Shift-Right>', lambda ev, h=1, v=0: self.nudge_shape(ev, h, v))
+        # self.master.bind('<Button-3>', lambda ev: self.toggle_selection(ev))
+
+        # self.bind('<Shift-Up>', lambda ev, h=0, v=-1: self.nudge_shape(ev, h, v))
+        # self.bind('<Shift-Down>', lambda ev, h=0, v=1: self.nudge_shape(ev, h, v))
+        # self.bind('<Shift-Left>', lambda ev, h=-1, v=0: self.nudge_shape(ev, h, v))
+        # works:
+        self.master.master.bind('<Shift-Right>', lambda ev, h=1, v=0: self.nudge_shape(ev, h, v))
+        # works:
+        self.bind('<Button-3>', lambda ev: self.toggle_selection(ev))
 
 
     def create_shape(self,
@@ -435,6 +430,25 @@ class ShapeCanvas(MyCanvas):
                                        outline=linecolor,
                                        width=width,
                                        tags=taglist)
+            case 'rectangle':
+                taglist = ['rectangle', tag]
+                id1 = self.create_rectangle(start,
+                                            end,
+                                            outline=linecolor,
+                                            width=width,
+                                            tags=taglist)
+            case 'arc':
+                taglist = ['arc', tag]
+                id1 = self.create_arc(start,
+                                      end,
+                                      outline=linecolor,
+                                      width=width,
+                                      start=90,
+                                      extent=90,
+                                      tags=taglist)
+                # test "rotate"
+                # self.some_fxn(id1, _)
+
             case _:
                 pass
 
@@ -449,8 +463,9 @@ class ShapeCanvas(MyCanvas):
         """
         # set_center(event)
 
-        # TODO: these values should be user preferences, not hard-coded here.
-        xwidth, ywidth = 20.0, 20.0
+        # TODO: these should be user preferences, not hard-coded values.
+        # xwidth, ywidth = 20.0, 20.0
+        xwidth, ywidth = self.oval_width, self.oval_height
 
         self.set_start(event)
 
@@ -545,20 +560,6 @@ class ShapeCanvas(MyCanvas):
         self.report_center(c, outline)
 
 
-    # def expand_shape(self, event):
-    #     """Handler for L-mouse button + CONTROL key to modify a shape object.
-    #
-    #     Interactively enlarges the selected shape.
-    #     """
-    #     if self.selected is None: return
-    #     theshape = self.selected
-    #     this_tag = self.gettags(theshape)[1]
-    #     this_index = self.shapetags.index(this_tag)
-    #     center_posn = self.shape_centers[this_index]
-    #
-    #     self.scale(theshape, center_posn['x'], center_posn['y'], 1.01, 1.01)
-
-
     def resize_shape(self, event):
         """Handler for L-mouse button + CONTROL key to modify a shape object.
 
@@ -578,20 +579,6 @@ class ShapeCanvas(MyCanvas):
             self.scale(theshape, center_posn['x'], center_posn['y'], 0.99, 0.99)
 
         self.motionx, self.motiony = event.x, event.y
-
-
-    # def contract_shape(self, event):
-    #     """Handler for L-mouse button + ALT key to modify a shape object.
-    #
-    #     Interactively reduces the size of the selected shape.
-    #     """
-    #     if self.selected is None: return
-    #     theshape = self.selected
-    #     this_tag = self.gettags(theshape)[1]
-    #     this_index = self.shapetags.index(this_tag)
-    #     center_posn = self.shape_centers[this_index]
-    #
-    #     self.scale(theshape, center_posn['x'], center_posn['y'], 0.99, 0.99)
 
 
     def toggle_selection(self, event):
@@ -625,9 +612,11 @@ class ShapeCanvas(MyCanvas):
         attribute keeps track of the currently selected shape, by its id. The
         shape is highlighted with a color fill.
         """
+        print(f'shape tags: {self.shapetags}')
         # remove lighlight from all shapes
-        for n, item in enumerate(self.shapetags):
-            self.itemconfigure(item, fill='')
+        for item in enumerate(self.shapetags):
+            # print(item)
+            self.itemconfigure(item[1], fill='')
 
         found = self.find_closest(event.x, event.y, halo=25)
         if len(found) > 0:
@@ -701,6 +690,44 @@ def set_linewidth(var):
     mydrawcanvas.linewidth = var.get()
 
 
+# def set_oval_width(var):
+#     """Set width for oval shape on a canvas.
+#
+#     parameter: var = width, from the IntVar oval_line_width.
+#     """
+#     print(f'width var is: {var}')
+#     myshapecanvas.oval_width = var.get()
+
+
+# def set_oval_height(var):
+#     """Set height for oval shape on a canvas.
+#
+#     parameter: var = height, from the IntVar oval_line_height.
+#     """
+#     print(f'height var is: {var}')
+#     myshapecanvas.oval_height = var.get()
+
+
+# def set_oval_size(v):
+#     match str(v):
+#         case 'ovalwidth':
+#             myshapecanvas.oval_width = v.get()
+#         case 'ovalheight':
+#             myshapecanvas.oval_height = v.get()
+
+
+def set_oval_size(var, index, mode):
+    match var:
+        case 'ovalwidth':
+            myshapecanvas.oval_width = oval_width.get()
+        case 'ovalheight':
+            myshapecanvas.oval_height = oval_height.get()
+
+
+def report_name(n):
+    print(f'reported: {n}')
+
+
 def open_picture():
     """Manage user selection of an image file, for display in a canvas."""
     # global file_path
@@ -732,6 +759,11 @@ def add_image(canv, fpath):
                              image=im_tk,
                              tag = 'image1')
 
+
+def set_next_shape(s):
+    """Designate the next shape to be drawn in the shape canvas."""
+    myshapecanvas.next_shape = s
+
 # not needed?
 # def set_center(ev):
 #     center_posn['x'], center_posn['y'] = ev.x, ev.y
@@ -742,14 +774,16 @@ root = tk.Tk()
 # image to be loaded; the object needs to be global
 im_tk = None
 
-mydrawcanvas = DrawCanvas(root,
+draw_frame = tk.Frame(root)
+mydrawcanvas = DrawCanvas(draw_frame,
                           mode='freehand',
                           width=640,
                           height=640,
                           background='#ccc'
                           )
 
-myshapecanvas = ShapeCanvas(root,
+shape_frame = tk.Frame(root)
+myshapecanvas = ShapeCanvas(shape_frame,
                             width=400,
                             height=500,
                             background='cyan'
@@ -757,39 +791,50 @@ myshapecanvas = ShapeCanvas(root,
 # no londer needed?
 # myshapecanvas.bind('<Button-3>', lambda event: self.select_shape(event))
 
+# num_colors = 8  # not used yet
+#
+# colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'magenta', 'black']
+# xs = list(range(0, 320, 40))
+# y1 = 0
+# y2 = 42
+# colorbar = tk.Canvas(draw_frame, width=320, height=40)
+# for n, x in enumerate(xs):
+#     colorbar.create_rectangle(x, y1, x + 40, y2, fill=colors[n], tags=colors[n])  # + str(n))
+#
+# # colorbar.bind('<1>', set_color)
+# colorbar.bind('<1>', lambda ev, canv=(mydrawcanvas, myshapecanvas): set_color(ev, canv))
+#
+linewidths = [str(i) for i in list(range(1, 11))]
+
+viewport1 = {'w': 400, 'h': 500, 'gutter': 10}
+# viewpor2 = {'w': 640, 'h': 640, 'gutter': 10}
+
+
+# draw canvas controls ----------
+controls_1 = ttk.Frame(draw_frame, padding=2, relief='groove')
+
 num_colors = 8  # not used yet
 
 colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'magenta', 'black']
 xs = list(range(0, 320, 40))
 y1 = 0
 y2 = 42
-colorbar = tk.Canvas(root, width=320, height=40)
+colorbar = tk.Canvas(controls_1, width=320, height=40)
 for n, x in enumerate(xs):
     colorbar.create_rectangle(x, y1, x + 40, y2, fill=colors[n], tags=colors[n])  # + str(n))
+colorbar.pack()
 
-# colorbar.bind('<1>', set_color)
 colorbar.bind('<1>', lambda ev, canv=(mydrawcanvas, myshapecanvas): set_color(ev, canv))
 
-linewidths = [str(i) for i in list(range(1, 11))]
-
-# drawcanvas:
-# viewport1 = {'w': 640, 'h': 640, 'gutter': 10}
-# shapecanvas:
-viewport1 = {'w': 400, 'h': 500, 'gutter': 10}
-
-
-# draw canvas controls ----------
-controls_1 = ttk.Frame(root, padding=2, relief='groove')
-
 status = ttk.Label(controls_1, text='mode:')
-status.pack(side='left')
+status.pack(side='left', padx=5)
 
 status_value = ttk.Label(controls_1, foreground='blue', text=mydrawcanvas.mode)
 status_value.pack(side='left')
 
 cursor_posn = tk.Text(background='#ff0')
 
-lw = ttk.Label(controls_1, text='line width:')
+line_w = ttk.Label(controls_1, text='line width:')
 
 linewidth_value = tk.IntVar(value=1)
 adj_linewidth = ttk.Spinbox(controls_1,
@@ -803,7 +848,7 @@ adj_linewidth = ttk.Spinbox(controls_1,
                             command=lambda var=linewidth_value: set_linewidth(var))
 
 adj_linewidth.pack(side='right', pady=5)
-lw.pack(side='right', padx=5)
+line_w.pack(side='right', padx=5)
 # ---------- END draw canvas controls
 
 
@@ -814,11 +859,95 @@ lw.pack(side='right', padx=5)
 
 center_posn = {'x': 0, 'y': 0}
 
-controls_2 = ttk.Frame(root, padding=2, relief='groove')
+controls_2 = ttk.Frame(shape_frame, padding=2, relief='groove')
 
 open_button = tk.Button(controls_2, text="Open Image", command=open_picture)
+# open_button.pack(pady=5)
+open_button.grid(column=1, row=0, pady=5)
 
-circle = ttk.Button(controls_2, text='circle', name='circle', cursor='arrow')#, command=lambda w=circle: set_shape(w))
+oval = ttk.Button(controls_2, text='oval', name='oval', cursor='arrow', command=lambda w='oval': set_next_shape(w))
+# circle.pack(pady=5)
+oval.grid(column=0, row=1, padx=5, pady=5)#, sticky='ew')
+
+# oval settings ===============
+# oval_settings = tk.Frame(controls_2)
+
+# width
+# -----
+# oval_heights = [n for n in range(20, 50, 10)]
+# oval_h = ttk.Label(oval_settings, text='width:')
+#
+# oval_width_value = tk.IntVar(value=20)
+# oval_width_setting = ttk.Spinbox(oval_settings,
+#                                  width=3,
+#                                  from_=1,
+#                                  to=10,
+#                                  values=oval_heights,
+#                                  wrap=True,
+#                                  # foreground='blue',
+#                                  textvariable=oval_width_value,
+#                                  command=lambda var=oval_width_value: set_oval_width(var))
+#
+# oval_h.pack(side='left', padx=5)
+# oval_width_setting.pack(side='left', pady=5)
+
+
+# test class
+# try doing the spinbox callback using .trace
+# as in:  https://www.askpython.com/python-modules/tkinter/tkinter-intvar
+oval_width = tk.IntVar(value=20, name='ovalwidth')
+oval_width.trace_add(mode='write', callback=set_oval_size)
+settings_w = tc.ToolFrame(controls_2,
+                        display_name='W',
+                        var=oval_width,
+                        callb=report_name,
+                        posn=[2, 0],
+                        stick='')
+
+oval_height = tk.IntVar(value=20, name='ovalheight')
+oval_height.trace_add(mode='write', callback=set_oval_size)
+settings_h = tc.ToolFrame(controls_2,
+                        display_name='H',
+                        var=oval_height,
+                        callb=report_name,
+                        posn=[3, 0],
+                        stick='')
+
+
+
+# height
+# -----
+# oval_heights = [n for n in range(20, 50, 10)]
+# oval_h = ttk.Label(oval_settings, text='height:')
+#
+# oval_height_value = tk.IntVar(value=20)
+# oval_height_setting = ttk.Spinbox(oval_settings,
+#                                  width=3,
+#                                  from_=1,
+#                                  to=10,
+#                                  values=oval_heights,
+#                                  wrap=True,
+#                                  # foreground='blue',
+#                                  textvariable=oval_height_value,
+#                                  command=lambda var=oval_height_value: set_oval_height(var))
+#
+# oval_h.pack(side='left', padx=5)
+# oval_height_setting.pack(side='left', pady=5)
+
+
+# =============== END oval settings
+
+rectangle = ttk.Button(controls_2, text='rectangle', name='rectangle', cursor='arrow', command=lambda w='rectangle': set_next_shape(w))
+rectangle.grid(column=1, row=1, padx=5, pady=5)#, sticky='ew')
+
+arc = ttk.Button(controls_2, text='arc', name='arc', cursor='arrow', command=lambda w='arc': set_next_shape(w))
+arc.grid(column=2, row=1, padx=5, pady=5)#, sticky='ew')
+
+# oval_settings.grid(column=1, row=2, padx=5, pady=5)
+
+controls_2.columnconfigure(0, weight=1)
+controls_2.columnconfigure(1, weight=1)
+controls_2.columnconfigure(2, weight=1)
 # ---------- END shape canvas controls
 
 
@@ -837,17 +966,16 @@ btnq = ttk.Button(quit_fr,
 # myshapecanvas.grid(column=1, row=3)
 # controls_2.grid(column=1, row=4)
 
+draw_frame.grid(column=0, row=1)
 mydrawcanvas.grid(column=0, row=1)
-controls_1.grid(column=0, row=2, sticky='ew')
-colorbar.grid(column=0, row=3, pady=10)
+# colorbar.grid(column=0, row=2, pady=10)
+controls_1.grid(column=0, row=3, sticky='ew')
 
-myshapecanvas.grid(column=1, row=1)
-open_button.grid(column=0, row=1, pady=10)
-circle.grid(column=0, row=2)
-controls_2.grid(column=1, row=2, sticky='ew')
+shape_frame.grid(column=1, row=1)
+myshapecanvas.grid(column=0, row=1)
+controls_2.grid(column=0, row=2, sticky='ew')
 
 btnq.pack()
-# quit_fr.grid(column=0, row=8, pady=10)
 quit_fr.grid(column=0, row=4, pady=10)
 
 # mydrawcanvas.update()
