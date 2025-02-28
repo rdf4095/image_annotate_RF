@@ -34,7 +34,7 @@ class ToolFrame(ttk.Frame):
         add widget children to the Frame.
     """
     def __init__(self, parent,
-                 cb_values=[20, 30, 40],
+                 cb_values=(20, 30, 40),
                  display_name='',
                  name='',
                  var=None,
@@ -49,10 +49,11 @@ class ToolFrame(ttk.Frame):
         ----------
         cb_values : list
             values passed through to a Combobox.
+
         var : str
             variable name.
-        post : function
-            callback for the ComboboxSelected event.
+        callb : function
+            callback for the widget event.
         posn : list
             row and column for gridding child objects.
         display_name : str
@@ -71,6 +72,7 @@ class ToolFrame(ttk.Frame):
 
         self.cb_values = cb_values
         self.var = var
+        # print(f'in class, var is {type(var)}')
         self.callb = callb
         self.posn = posn
         self.display_name = display_name
@@ -85,6 +87,7 @@ class ToolFrame(ttk.Frame):
     def create_widgets(self):
         lab = ttk.Label(self,
                         text=self.label_name)
+        # print(f'in create_widgets, var is {type(self.var)}')
 
         # could add a postcommand attribute, which executes before the callb.
         cb = ttk.Spinbox(self,
