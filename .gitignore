@@ -1,0 +1,15 @@
+# python virtual environment files
+.venv/
+
+# vscode info
+.vscode/
+
+# Jupyter
+notebook-01.ipynb
+
+# python files
+canvas_test.py
+
+# text files
+notes.txt
+history.txt
