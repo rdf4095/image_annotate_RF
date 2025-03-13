@@ -30,11 +30,12 @@ history:
             new fxn get_and_display_center().
 02-26-2025  Create new folder "canvas" at the same level as this project, and
             move canvas class definitions there.
+03-01-2025  Group code for each canvas' controls with it. Add colorbar object
+            to myshapecanvas, pass colorbar to set_color().
+03-11-2025  Add widgets for rect and arc size. Use classes from canvas module.
 """
 """
-TODO: 1. Change logic for shape size by having create_shape read the h,w 
-      spinboxes for each shape, and calculate the start_posn and end_posn.
-      Then you don't need posn arguments in the fxn call.
+
 """
 
 from PIL import Image, ImageTk
@@ -43,18 +44,38 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 from importlib.machinery import SourceFileLoader
 
-import tool_classes as tc
-cnv = SourceFileLoader("cnv", "../image_display_RF/canvas_ui.py").load_module()
-cnv_classes = SourceFileLoader("cnv_classes", "../canvas/canvas_classes.py").load_module()
+# import tool_classes as tc
+tc = SourceFileLoader("tc", "../utilities/tool_classes.py").load_module()
+cnv = SourceFileLoader("cnv_classes", "../canvas/canvas_classes.py").load_module()
 # tc = SourceFileLoader("tc", "./tool_classes.py").load_module()
 
-def set_color(event, canvaslist):
-    """Set color for lines drawn on canvases."""
-    color_choice = colorbar.gettags('current')[0]
+def set_color(event, cb, canv):
+    """Set color for lines drawn on canvases.
 
-    for canv in canvaslist:
-        canv.linecolor = color_choice
-        report_color(canv, color_choice)
+    Parameters:
+        event: widget event bound to this function
+        cb : colorbar object
+        canv : canvas object
+    """
+    # print(f'handling event {event}')
+    # print(f' set_color on canv: {canv.name}')
+    color_choice = cb.gettags('current')[0]
+
+    canv.linecolor = color_choice
+    report_color(canv, color_choice)
+
+
+# def set_color(event, objs):
+#     """Set color for lines drawn on canvases.
+#
+#     Parameters:
+#         event: widget event bound to this function
+#         objs : dict of objects
+#     """
+#     color_choice = objs['colorbar'].gettags('current')[0]
+#
+#     objs['mycanvas'].linecolor = color_choice
+#     report_color(objs['mycanvas'], color_choice)
 
 
 def report_color(canv, textstr) -> None:
@@ -71,21 +92,31 @@ def report_color(canv, textstr) -> None:
 def set_linewidth(var):
     """Set line width for lines or shapes on a canvas.
 
-    parameter: var = line width, from the IntVar in adj_linewidth.
+    parameter:
+        var : line width, from the IntVar in adj_linewidth.
     """
     mydrawcanvas.linewidth = var.get()
 
 
-def set_oval_size(var, index, mode):
+def set_next_shape_size(var, index, mode):
     match var:
         case 'ovalwidth':
             myshapecanvas.oval_width = oval_width.get()
         case 'ovalheight':
             myshapecanvas.oval_height = oval_height.get()
+        case 'rectwidth':
+            myshapecanvas.rect_width = rect_width.get()
+        case 'rectheight':
+            myshapecanvas.rect_height = rect_height.get()
+        case 'arcwidth':
+            myshapecanvas.arc_width = arc_width.get()
+        case 'archeight':
+            myshapecanvas.arc_height = arc_height.get()
 
 
 def report_name(n):
-    print(f'reported: {n}')
+    pass
+    # print(f'reported: {n}')
 
 
 def open_picture():
@@ -111,7 +142,7 @@ def add_image(canv, fpath):
                                ('center', 'center'))
     # print(f'placement x,y: {placement.x}, {placement.y}')
 
-    imid = canv.create_image(placement.x, placement.y,
+    canv.create_image(placement.x, placement.y,
                              anchor=tk.NW,
                              image=im_tk,
                              tag = 'image1')
@@ -120,49 +151,62 @@ def add_image(canv, fpath):
 def set_next_shape(s):
     """Designate the next shape to be drawn in the shape canvas."""
     myshapecanvas.next_shape = s
+    match s:
+        case 'oval':
+            print('oval')
+            oval.configure(state='active')
+            rectangle.configure(state='normal')
+            arc.configure(state='normal')
+        case 'rectangle':
+            print('rectangle')
+            oval.configure(state='normal')
+            rectangle.configure(state='active')
+            arc.configure(state='normal')
+        case 'arc':
+            print('arc')
+            oval.configure(state='normal')
+            rectangle.configure(state='normal')
+            arc.configure(state='active')
 
+
+def set_test(ev, wid, s):
+    print(ev)
+    # print(wid)
+    wid.configure(state='active')
+    rectangle.configure(state='active')
 
 root = tk.Tk()
 
+# module variables
+# ----------------
 # image file to be loaded; the object needs to be global
 im_tk = None
+linewidths = [str(i) for i in list(range(1, 11))]
+colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'magenta', 'black']
+xs = list(range(0, 320, 40))
+y1 = 0
+y2 = 42
+
+# draw canvas ----------
 
 draw_frame = tk.Frame(root)
-mydrawcanvas = cnv_classes.DrawCanvas(draw_frame,
+mydrawcanvas = cnv.DrawCanvas(draw_frame,
                           mode='lines',
                           width=400,
                           height=500,
                           background='#ffa'
                           )
+# print(mydrawcanvas._name)
+# objects['mycanvas'] = mydrawcanvas
 
-shape_frame = tk.Frame(root)
-myshapecanvas = cnv_classes.ShapeCanvas(shape_frame,
-                            width=400,
-                            height=500,
-                            background='cyan'
-                            )
-
-# no londer needed?
-# ...can we ad hoc bind some other action like this?
-# myshapecanvas.bind('<Button-3>', lambda event: self.select_shape(event))
-
-linewidths = [str(i) for i in list(range(1, 11))]
-
-viewport1 = {'w': 400, 'h': 500, 'gutter': 10}
-
-
-# draw canvas controls ----------
 controls_1 = ttk.Frame(draw_frame, padding=2, relief='groove')
 
-colors = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'magenta', 'black']
-xs = list(range(0, 320, 40))
-y1 = 0
-y2 = 42
-colorbar = tk.Canvas(controls_1, width=320, height=40)
+colorbar1 = tk.Canvas(controls_1, width=320, height=40)
 for n, x in enumerate(xs):
-    colorbar.create_rectangle(x, y1, x + 40, y2, fill=colors[n], tags=colors[n])  # + str(n))
-colorbar.bind('<1>', lambda ev, canv=(mydrawcanvas, myshapecanvas): set_color(ev, canv))
-colorbar.pack()
+    colorbar1.create_rectangle(x, y1, x + 40, y2, fill=colors[n], tags=colors[n])  # + str(n))
+colorbar1.bind('<1>', lambda ev, cb=colorbar1, canv=mydrawcanvas: set_color(ev, cb, canv))
+# colorbar1.bind('<1>', lambda ev, objs=objects: set_color(ev, objs))
+colorbar1.pack()
 
 status = ttk.Label(controls_1, text='mode:')
 status.pack(side='left', padx=5)
@@ -187,10 +231,20 @@ adj_linewidth = ttk.Spinbox(controls_1,
 
 adj_linewidth.pack(side='right', pady=5)
 line_w.pack(side='right', padx=5)
-# ---------- END draw canvas controls
 
+# ---------- END draw canvas
 
-# shape canvas controls --------------
+# shape canvas ----------
+
+shape_frame = tk.Frame(root)
+myshapecanvas = cnv.ShapeCanvas(shape_frame,
+                            width=400,
+                            height=500,
+                            background='cyan'
+                            )
+
+viewport1 = {'w': 400, 'h': 500, 'gutter': 10}
+
 # needed?
 # shape_var = tk.StringVar(value=shape_value)
 
@@ -198,49 +252,112 @@ center_posn = {'x': 0, 'y': 0}
 
 controls_2 = ttk.Frame(shape_frame, padding=2, relief='groove')
 
+colorbar2 = tk.Canvas(controls_2, width=320, height=40)
+for n, x in enumerate(xs):
+    colorbar2.create_rectangle(x, y1, x + 40, y2, fill=colors[n], tags=colors[n])  # + str(n))
+colorbar2.bind('<1>', lambda ev, cb=colorbar2, canv=myshapecanvas: set_color(ev, cb, canv))
+
 open_button = tk.Button(controls_2, text="Open Image", command=open_picture)
-open_button.grid(column=1, row=0, pady=5)
 
 oval = ttk.Button(controls_2, text='oval', name='oval', cursor='arrow', command=lambda w='oval': set_next_shape(w))
-oval.grid(column=0, row=1, padx=5, pady=5)
+# oval.configure(state='active')
+#       oval settings ----------
 
-# oval settings ===============
-
-oval_widths = (10, 40, 70)
+oval_widths = (20, 40, 60)
 oval_width = tk.IntVar(value=oval_widths[0], name='ovalwidth')
-oval_width.trace_add(mode='write', callback=set_oval_size)
-settings_w = tc.ToolFrame(controls_2,
-                        cb_values=oval_widths,
-                        display_name='W',
-                        var=oval_width,
-                        callb=report_name,
-                        posn=[2, 0],
-                        stick='')
+oval_width.trace_add(mode='write', callback=set_next_shape_size)
+settings_oval_w = tc.ToolFrame(controls_2,
+                               cb_values=oval_widths,
+                               display_name='W',
+                               var=oval_width,
+                               callb=report_name,
+                               posn=[0, 3],
+                               stick='')
 
-oval_heights = (15, 45, 75)
+oval_heights = (20, 50, 70)
 oval_height = tk.IntVar(value=oval_heights[0], name='ovalheight')
-oval_height.trace_add(mode='write', callback=set_oval_size)
-settings_h = tc.ToolFrame(controls_2,
-                        cb_values=oval_heights,
-                        display_name='H',
-                        var=oval_height,
-                        callb=report_name,
-                        posn=[3, 0],
-                        stick='')
+oval_height.trace_add(mode='write', callback=set_next_shape_size)
+settings_oval_h = tc.ToolFrame(controls_2,
+                               cb_values=oval_heights,
+                               display_name='H',
+                               var=oval_height,
+                               callb=report_name,
+                               posn=[0, 4],
+                               stick='')
 
-# =============== END oval settings
+#       ---------- END oval settings
 
-rectangle = ttk.Button(controls_2, text='rectangle', name='rectangle', cursor='arrow', command=lambda w='rectangle': set_next_shape(w))
-rectangle.grid(column=1, row=1, padx=5, pady=5)#, sticky='ew')
+
+#       rectangle settings ----------
+
+rect_widths = (20, 40, 60)
+rect_width = tk.IntVar(value=rect_widths[0], name='rectwidth')
+rect_width.trace_add(mode='write', callback=set_next_shape_size)
+settings_rect_w = tc.ToolFrame(controls_2,
+                               cb_values=rect_widths,
+                               display_name='W',
+                               var=rect_width,
+                               callb=report_name,
+                               posn=[1, 3],
+                               stick='')
+
+rect_heights = (20, 50, 70)
+rect_height = tk.IntVar(value=rect_heights[0], name='rectheight')
+rect_height.trace_add(mode='write', callback=set_next_shape_size)
+settings_rect_h = tc.ToolFrame(controls_2,
+                               cb_values=rect_heights,
+                               display_name='H',
+                               var=rect_height,
+                               callb=report_name,
+                               posn=[1, 4],
+                               stick='')
+
+#       ---------- END rectangle settings
+
+
+#       arc settings ----------
+
+arc_widths = (20, 40, 60)
+arc_width = tk.IntVar(value=arc_widths[0], name='arcwidth')
+arc_width.trace_add(mode='write', callback=set_next_shape_size)
+settings_arc_w = tc.ToolFrame(controls_2,
+                               cb_values=arc_widths,
+                               display_name='W',
+                               var=arc_width,
+                               callb=report_name,
+                               posn=[2, 3],
+                               stick='')
+
+arc_heights = (20, 50, 70)
+arc_height = tk.IntVar(value=arc_heights[0], name='archeight')
+arc_height.trace_add(mode='write', callback=set_next_shape_size)
+settings_arc_h = tc.ToolFrame(controls_2,
+                               cb_values=arc_heights,
+                               display_name='H',
+                               var=arc_height,
+                               callb=report_name,
+                               posn=[2, 4],
+                               stick='')
+
+#       ---------- END arc settings
+
+# rectangle = ttk.Button(controls_2, text='rectangle', name='rectangle', cursor='arrow', command=lambda w='rectangle': set_next_shape(w))
+rectangle = ttk.Button(controls_2, text='rectangle', name='rectangle', state='normal', cursor='arrow')
+rectangle.bind('<Button-1>', lambda ev, wid=rectangle, w='rectangle': set_test(ev, wid, w))
 
 arc = ttk.Button(controls_2, text='arc', name='arc', cursor='arrow', command=lambda w='arc': set_next_shape(w))
-arc.grid(column=2, row=1, padx=5, pady=5)#, sticky='ew')
 
 controls_2.columnconfigure(0, weight=1)
 controls_2.columnconfigure(1, weight=1)
 controls_2.columnconfigure(2, weight=1)
 
-# ---------- END shape canvas controls
+colorbar2.grid(column=0,   row=0, columnspan=3, pady=5)
+open_button.grid(column=1, row=1, pady=5)
+oval.grid(column=0,        row=2, padx=5, pady=5)
+rectangle.grid(column=1,   row=2, padx=5, pady=5)#, sticky='ew')
+arc.grid(column=2,         row=2, padx=5, pady=5)#, sticky='ew')
+
+# ---------- END shape canvas
 
 
 quit_fr = ttk.Frame(root)
@@ -249,18 +366,16 @@ btnq = ttk.Button(quit_fr,
                   command=root.quit,
                   style="MyButton1.TButton")
 
-# draw_frame.grid(column=0, row=1)
-draw_frame.grid(column=0, row=0)
+draw_frame.grid(column=0, row=0, padx=10)
 mydrawcanvas.grid(column=0, row=1)
-controls_1.grid(column=0, row=3, sticky='ew')
+# controls_1.grid(column=0, row=3, sticky='ew')
+controls_1.grid(column=0, row=2, sticky='ew')
 
-# shape_frame.grid(column=1, row=1)
 shape_frame.grid(column=1, row=0)
 myshapecanvas.grid(column=0, row=1)
 controls_2.grid(column=0, row=2, sticky='ew')
 
 btnq.pack()
-# quit_fr.grid(column=0, row=4, pady=10)
 quit_fr.grid(column=0, row=1, pady=10)
 
 if __name__ == '__main__':
